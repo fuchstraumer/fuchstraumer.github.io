@@ -1,0 +1,11 @@
+@import url('https://fonts.googleapis.com/css?family=Rokkitt:500,600,700,800|Ubuntu');
+
+// Mobile breakpoints
+@mixin mobile {
+  @media screen and (max-width: 640px) {
+    @content;
+  }
+}
+
+$base-family: 'Ubuntu', sans-serif;
+$header-family: 'Rokkitt', serif;

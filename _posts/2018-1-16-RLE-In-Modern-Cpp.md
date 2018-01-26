@@ -1,0 +1,18 @@
+---
+layout: post
+title: Run-Length Encoding in Modern C++
+---
+
+This is a test blogpost, yay! 
+
+Test code block fragment:
+```cpp
+template<typename T>
+constexpr inline size_t rle_compressor_t<T>::countUniques(const_iterator iter, const_iterator end) const noexcept {
+    const auto first = iter;
+    while ( (iter + 1) != end && *(iter + 1) != *iter) {
+        ++iter;
+    }
+    return std::distance(first, iter);
+}
+```
