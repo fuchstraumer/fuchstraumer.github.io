@@ -1,15 +1,13 @@
-
-title: Fox Noises
+name: Fox Noises
 email: fuchstraumer@gmail.com
-description: >- # this means to ignore newlines until "baseurl:"
-  Graphics Programming and Space Stuff
+description: Graphics Programming and Space Stuff 
 footer-links:
   github: fuchstraumer
 avatar: "https://avatars2.githubusercontent.com/u/11087615?s=460&v=4"
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "https://fuchstraumer.github.io" # the base hostname & protocol for your site, e.g. http://example.com
+url: https://fuchstraumer.github.io # the base hostname & protocol for your site, e.g. http://example.com
 
-# fixed flags
+# fixed flag
 version: v1.2.0
 kramdown:
   input: GFM
@@ -21,6 +19,7 @@ theme: minima
 sass:
   style: :expanded
 
+permalink: /:title/
 plugins:
   - jekyll-feed
   - jekyll-mentions
