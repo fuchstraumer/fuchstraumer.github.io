@@ -20,7 +20,7 @@ kramdown:
 sass:
   style: :expanded
 
-theme: minima
+theme: hydeout
 plugins:
   - jekyll-feed
   - jekyll-mentions
