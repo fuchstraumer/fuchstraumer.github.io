@@ -1,4 +1,23 @@
-@import url('https://fonts.googleapis.com/css?family=Rokkitt:500,600,700,800|Ubuntu');
+
+//
+// VARIABLES
+//
+
+// Colors
+$blue: #4183C4;
+
+// Grays
+$black: #000;
+$darkerGray: #222;
+$darkGray: #333;
+$gray: #666;
+$lightGray: #eee;
+$white: #fff;
+
+// Font stacks
+$helvetica: Helvetica, Arial, sans-serif;
+$helveticaNeue: "Helvetica Neue", Helvetica, Arial, sans-serif;
+$georgia: Georgia, serif;
 
 // Mobile breakpoints
 @mixin mobile {
@@ -6,6 +25,3 @@
     @content;
   }
 }
-
-$base-family: 'Ubuntu', sans-serif;
-$header-family: 'Rokkitt', serif;
