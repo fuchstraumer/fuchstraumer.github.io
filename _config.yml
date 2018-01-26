@@ -21,7 +21,6 @@ kramdown:
 sass:
   style: :expanded
 
-theme: hydeout
 plugins:
   - jekyll-feed
   - jekyll-mentions
