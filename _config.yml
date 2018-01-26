@@ -14,8 +14,9 @@ kramdown:
   synatx_highlighter: rouge
   syntax_highliger_opts:
     css_class: 'highlight'
+
 google-analytics: UA-30324363-1 
-theme: minima
+
 sass:
   style: :expanded
 
