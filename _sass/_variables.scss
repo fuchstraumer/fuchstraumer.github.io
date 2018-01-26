@@ -2,7 +2,7 @@
 //
 // VARIABLES
 //
-
+@import url('https://fonts.googleapis.com/css?family=Rokkitt:500,600,700,800|Ubuntu');
 // Colors
 $blue: #4183C4;
 
@@ -14,10 +14,8 @@ $gray: #666;
 $lightGray: #eee;
 $white: #fff;
 
-// Font stacks
-$helvetica: Helvetica, Arial, sans-serif;
-$helveticaNeue: "Helvetica Neue", Helvetica, Arial, sans-serif;
-$georgia: Georgia, serif;
+$ubuntu: "Ubuntu", sans-serif;
+$rokkitt: 'Rokkitt', serif;
 
 // Mobile breakpoints
 @mixin mobile {
