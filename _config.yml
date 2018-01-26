@@ -8,8 +8,7 @@ footer-links:
 avatar: "https://avatars2.githubusercontent.com/u/11087615?s=460&v=4"
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://fuchstraumer.github.io" # the base hostname & protocol for your site, e.g. http://example.com
-twitter_username: jekyllrb
-github_username:  jekyll
+
 # fixed flags
 version: v1.2.0
 kramdown:
@@ -17,7 +16,8 @@ kramdown:
   synatx_highlighter: rouge
   syntax_highliger_opts:
     css_class: 'highlight'
-  
+google-analytics: UA-30324363-1 
+theme: minima
 sass:
   style: :expanded
 
