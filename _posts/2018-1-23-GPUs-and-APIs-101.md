@@ -3,6 +3,7 @@ layout: post
 date: 2018-01-25
 title: "Graphics Hardware, Graphics APIs, and Graphics Programming 101"
 published: true
+img: sweden.jpg
 tag: [Vulkan, C++, Programming, Graphics, Graphics API, General]
 ---
 

@@ -3,6 +3,7 @@ layout: post
 date: 2018-01-25
 title: "Abstracting the Vulkan API"
 published: true
+img: new-zealand.jpg
 tags: [Programming, C++, Vulkan, Graphics, Libraries]
 ---
 

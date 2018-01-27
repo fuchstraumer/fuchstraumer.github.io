@@ -1,0 +1,36 @@
+---
+layout: default
+title: About
+permalink: /about/
+---
+<section class="about">
+    <a href="{{site.baseurl}}/" class="button_back"><i class="fa fa-long-arrow-left" aria-hidden="true"></i>Back...</a>
+    <div class="about_box">
+        <div class="author">
+            <div class="author_image">
+                <img src="{{site.baseurl}}/assets/img/{{site.author-pic}}" alt="">
+            </div>
+            <div class="author_info">
+                <h2 class="author_title">{{site.author-name}}</h2>
+                <p class="author_subtitle">
+                    I currently work for Tethers Unlimited in Seattle, WA, as our only applications developer in a sea of (thoroughly talented)
+                    embedded systems developers. Currently, I'm supporting efforts to revitalize our tether dynamics and astrodynamics suite
+                    to be cross platform, more performant, more capable, and more adaptive. I've also assisted on NASA SBIR efforts like Refabricator,
+                    CRISSP, CoGZ, and a few others.
+                </p>
+                <p class="author_subtitle">
+                    I spend my free time (what little of it I have, anymore) either working on my personal programming projects or, lately, getting back
+                    into music production. My personal projects tend to focus on things that interest me the most - that being intricate systems (Vulkan),
+                    and fascinating topics like procedural generation of landscapes, worlds, and even solar systems/universes (thus, my interest in procgen
+                    and large-scale rendering).
+                </p>
+                <p class="author_subtitle">
+                    Feel free to reach out to me if you'd like to know more about my personal projects or (god forbid) you believe I can help you with your own work.
+                </p>
+            </div>
+        </div>
+        <div class="about_social">
+            {% include social_footer.html %}
+        </div>
+    </div>
+</section>
