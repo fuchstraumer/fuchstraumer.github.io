@@ -1,15 +1,16 @@
 ---
 layout: page
 title: About
-permalink: /about/
+sitemap:
+    priority: 0.7
+    lastmod: 2018-1-25
 ---
 
-Some information about you!
+## About Me
 
-### More Information
+I currently work for Tethers Unlimited in Seattle, WA, as our only applications developer in a sea of (thoroughly talented)
+embedded systems developers. Currently, I'm supporting efforts to revitalize our tether dynamics and astrodynamics suite
+to be cross platform, more performant, more capable, and more adaptive. I've also assisted on NASA SBIR efforts like Refabricator,
+CRISSP, CoGZ, and a few others.
 
-A place to include any other types of information that you'd like to include about yourself.
-
-### Contact me
-
-[email@domain.com](mailto:email@domain.com)
+Feel free to contact me with any questions or inquiries you may have - I'd be glad to respond.

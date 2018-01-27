@@ -1,7 +1,8 @@
 ---
 layout: post
+date: 2018-01-25
 title: Abstracting the Vulkan API
-published: false
+published: true
 ---
 
 ![Vulkan API Logo](https://www.amd.com/system/files/48981-vulkan-logo-1260x709.png)

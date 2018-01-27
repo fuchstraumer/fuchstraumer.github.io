@@ -1,7 +1,8 @@
 ---
 layout: post
+date: 2018-01-25
 title: Graphics Hardware, Graphics APIs, and Graphics Programming 101
-published: false
+published: true
 ---
 
 I have a number of family members, friends, and associates who either:
