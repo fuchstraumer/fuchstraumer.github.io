@@ -42,7 +42,6 @@ gems:
   - jekyll-feed
   - jekyll-gist
   - jekyll-paginate
-  - github-pages
 
 paginate: 6
 paginate_path: "/posts/page:num/"
