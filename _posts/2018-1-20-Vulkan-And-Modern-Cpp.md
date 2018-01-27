@@ -1,8 +1,9 @@
 ---
 layout: post
 date: 2018-01-25
-title: Abstracting the Vulkan API
+title: "Abstracting the Vulkan API"
 published: true
+tags: [Programming, C++, Vulkan, Graphics, Libraries]
 ---
 
 ![Vulkan API Logo](https://www.amd.com/system/files/48981-vulkan-logo-1260x709.png)

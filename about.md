@@ -1,9 +1,7 @@
 ---
-layout: page
+layout: default
 title: About
-sitemap:
-    priority: 0.7
-    lastmod: 2018-1-25
+permalink: /about/
 ---
 
 ## About Me

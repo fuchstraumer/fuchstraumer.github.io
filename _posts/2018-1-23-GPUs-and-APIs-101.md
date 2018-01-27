@@ -1,8 +1,9 @@
 ---
 layout: post
 date: 2018-01-25
-title: Graphics Hardware, Graphics APIs, and Graphics Programming 101
+title: "Graphics Hardware, Graphics APIs, and Graphics Programming 101"
 published: true
+tag: [Vulkan, C++, Programming, Graphics, Graphics API, General]
 ---
 
 I have a number of family members, friends, and associates who either:

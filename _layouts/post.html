@@ -1,63 +1,78 @@
-<!DOCTYPE HTML>
-<html>
-    <head>
-        {% include head.html %}
-    </head>
-    <body class="is-loading">
-        <div id="wrapper" class="fade-in">
-            <header id="header">
-                <a href="{{ "/" | absolute_url }}" class="logo">{{site.title}}</a>
-            </header>
+---
+layout: default
+---
+{% include header.html %}
 
-            <nav id="nav">
-                {% include nav.html %}
-                <ul class="icons">
-                    <li><a href="https://github.com/{{site.github}}" class="icon fa-github" rel="nofollow"><span class="label">Github</span></a></li>
-                </ul>
-            </nav>
-
-            <div id="main">
-                <section class="post">
-                    <header class="major">
-                        <span clas="date">{{page.date | date_to_string}}</span>
-                        <h1>{{page.title}}</h1>
-                        <p>{{page.excerpt}}</p>
-                    </header>
-                    <div class="image main"><img src"{{page.image}}" alt=""></div>
-                    <p>{{content}}</p>
-                </section>
-
-                <div class="comments-wrapper">
-                    <div id="disqus_thread"></div>
-                    <script>
-                        var disqus_config = function() {
-                            this.page.url = '{{absolute_url}}{{page.url}}';
-                            this.page.identifier = '{{page.url}}';
-                        };
-
-                        (function() {
-                            var d = document, s = d.createElement('script');
-                            s.src = 'https://{{site.disqus_shortname}}.disqus.com/embed.js';
-                            s.setAttribute('data-timestamp', +new Date());
-                            (d.head || d.body).appendChild(s);
-
-                        })();
-                    </script>
-                    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow"> comments powered by Disqus</a></noscript>
-                </div>
-
-                <footer>
-                    <ul class="actions">
-                        <li><a href="{{ "/posts/" | absolute_url }}" class="button">Posts</a></li>
-                    </ul>
-                </footer>
+<main class="post_content">
+    <article class="post">
+        <header>
+            <div class="post_image">
+                <img src={{"/assets/img/" | prepend: site.baseurl | append : page.img}} alt="{{page.title}}">
             </div>
+            <div class="post_description">
+                <p class="post_meta">{{page.date | date: '%Y, %b %d'}}</p>
+                <h1 class="post_title">{{page.title}}</h1>
+            </div>
+        </header>
 
-            {% include foot.html %}
+        <div class="entry_content">
+            {{page.content | markdownify}}
         </div>
 
-        {% include scripts-main.html %}
-        {% include tracking.html %}
+        <div class="post_wrapper">
+            <footer class="post_footer cf">
+                <div class="post_share">
+                    <span>Share:</span>
+                    <a href="https://twitter.com/intent/tweet?text={{ page.title }}&url={{ site.url }}{{ page.url }}" title="Share on Twitter" rel="nofollow" target="_blank"><i class="fa fa-twitter" aria-hidden="true"></i></a>
+                    <a href="https://facebook.com/sharer.php?u={{ site.url }}{{ page.url }}" title="Share on Facebook" rel="nofollow" target="_blank"><i class="fa fa-facebook" aria-hidden="true"></i></a>
+                    <a href="https://plus.google.com/share?url={{ site.url }}{{ page.url }}" title="Share on Google+" rel="nofollow" target="_blank"><i class="fa fa-google" aria-hidden="true"></i></a>
+                </div>
+                <div class="post_tag">
+                    <span>Tags:</span>
+                    {% for tag in page.tags %}
+                    <a href="{{site.baseurl}}/tags#{{tag}}" class="tag">{{tag}}</a>
+                    {% endfor %}
+                </div>
+            </footer>
+        </div>
+    </article>
 
-    </body>
-</html>
+    <section class="author cf">
+        <div class="post_wrapper">
+            <div class="author_image">
+                <img src="{{site.baseurl}}/assets/img/{% if site.author-pic %}}{{ site.author-pic }}{% endif %}" alt="Author">
+            </div>
+            <div class="author_info">
+                <h2 class="author_title">
+                    {% if site.author-name %} {{ site.author-name }} 
+                    {% else %}  Anonymous {% endif %}
+                </h2>
+                <p class="author_subtitle">
+                    {% if site.about-author %} {{ site.about-author }}
+                    {% else %} N/A {% endif %}
+                </p>
+                <div class="author_social">
+                    <span class="author_email"><i class="fa fa-envelope-o" aria-hidden="true"></i><a href="mailto:{{site.email}}">{{site.email}}</a></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="recent_box">
+        <div class="post_wrapper">
+            <h2 class="recent_title">Recent posts</h2>
+            <div class="recent_list">
+                {% for post in site.posts offset:0 limit:6 %}
+                    {% if post.title %}
+                        <a href="{{ root_url }}{{ post_url }}" class="recent_item" style="background-image: url( {{ "/assets/img/" | preprend: site.baseurl | append : post.img}} )"><span>{{post.title}}</span></a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    {% include disqus.html %}
+
+</main>
+
+{% include footer.html %}

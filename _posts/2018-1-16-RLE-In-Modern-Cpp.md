@@ -1,7 +1,8 @@
 ---
 layout: post
 date: 2018-01-22
-title: Run-Length Encoding in Modern C++
+title: "Run-Length Encoding in Modern C++"
+tags: [C++, Modern, Modern C++, Utilities, Code, Standalone]
 ---
 
 This is a test blogpost, yay! 

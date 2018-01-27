@@ -1,90 +1,16 @@
 ---
-layout: null
-title: Fox Noises - Home
-description: landing page
-date: 1-22-2018
-sitemap:
-    priority: 1.0
-    lastmod: 2018-1-25
-    changefreq: weekly
+layout: main
 ---
-<!DOCTYPE HTML>
-<html>
-    <head>
-        {% include head.html %}
-    </head>
-
-    <body class="is-loading">
-        <!--Wrapper-->
-        <div id="wrapper" class="fade-in">
-            <div id="intro">
-                <h1>{{site.title}}</h1>
-                <h2>Vulkan, C++, and general musings</h2>
-                <ul class="actions">
-                    <li><a href="#header" class="button icon solo fa-arrow-down scrolly">Continue</a></li>
-                </ul>
-            </div>
-
-            <header id="header">
-                <a href="{{ "/" | absolute_url }}" class="logo">{{site.title}}</a>
-            </header>
-
-            <nav id="nav">
-                {% include nav.html %}
-                <ul class="icons">
-                    <li><a href="https://twitter.com/{{site.twitter}}" class="icon fa-twitter" rel="nofollow"><span class="label">Twitter</span></a></li>
-                    <li><a href="https://github.com//{{site.github}}" class="icon fa-github" rel="nowfollow"><span class="label">Github</span></a></li>
-                </ul>
-            </nav>
-
-            <div id="main">
-                <!--Featured post spot-->
-                <article class="post featured">
-                    <header class="major">
-                        <h2><a href="#">RLE Compression in Modern C++</a></h2>
-                        <p> RLE compression is an age-old simplistic compression method,
-                            and with a dash of modern C++ we can give it a bit of face-lift
-                            and make it flexible to container and data type passed to the 
-                            method.
-                        </p>
-                        <a href="#" class="image main"><img src="{{ "/images/pic01.jpg" | absolute_url }}" alt = ""></a>
-                    </header>
-                </article>
-
-                <section class="posts">
-                    {% for post in site.posts limit:3 %}
-                    {% assign mod3 = forloop.index | modulo: 3 %}
-                    <article>
-                        <header>
-                            <span class="date">{{post.date | date_to_string }}</span>
-                            <h2><a href="{{post.url | absolute_url}}">{{post.title}}</a></h2>
-                        </header>
-                        <a href="{{post.url | absolute_url}}" class="image fit"><img src ="{{post.image | absolute_url}}" alt=""/></a>
-                        <p>{{post.excerpt}}</p>
-                        <ul class="actions">
-                            <li><a href="{{post.url | absolute_url}}" class="button">Full Article</a></li>
-                        </ul>
-                    </article>
-                    {% if mod3 == 0 %}
-                    <article>
-                        <header>
-                            <h2><a href="#">Sponsored</a></h2>
-                        </header>
-                    </article>
-                    {% endif %}
-                    {% endfor %}
-                </section>
-
-                <footer>
-                    <ul class="actions">
-                        <li><a href="{{ "/blog/" | absolute_url }}" class=button>About</a></li>
-                    </ul>
-                </footer>
-            </div>
-            {% include foot.html %}
+{% for post in paginator.posts %}
+    <div class="chapter">
+        <a href="{{post.url}}">
+            {% if post.img %}
+            <img src={{ "/assets/img/" | prepend: site.baseurl | append: post.img }} alt="{{post.title}}">
+            {% endif %}
+        </a>
+        <div class="chapter_inner">
+            <p class="chapter_number">{{post.date | date: '%Y, %b %d'}}</p>
+            <h3 class="chapter_title">{{post.title}}</h3>
         </div>
-
-        {% include scripts-main.html %}
-        {% include tracking.html %}
-    </body>
-</html>
+    </div>
+{% endfor %}
