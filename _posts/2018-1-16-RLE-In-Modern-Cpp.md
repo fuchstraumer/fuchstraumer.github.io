@@ -1,5 +1,6 @@
 ---
 layout: post
+date: 2018-01-22
 title: Run-Length Encoding in Modern C++
 ---
 

@@ -1,0 +1,55 @@
+title: Fox Noises
+description: Graphics Programming, C++, and Space Stuff
+locale: en_US
+url: 'http://fuchstraumer.github.io'
+defaults:
+- scope:
+    path: ''
+    type: posts
+  values:
+    permalink: "/posts/:title/"
+    layout: post
+    author: Keegan Jones
+
+permalink: /posts/:title/
+markdown: kramdown
+highlighter: rouge
+kramdown:
+  auto_ids: true
+  footnote_nr: 1
+  entity_output: as_char
+  toc_levels: 1..6
+  enable_coderay: false
+mathjax: true
+sass:
+  sass_dir: _sass
+  style: compressed
+
+disqus_shortname: default
+analytics-id: UA-30324363-1 
+twitter: default
+facebook: default
+instagram: default
+github: fuchstraumer
+
+location: Seattle, WA
+phone: default
+email: fuchstraumer@gmail.com
+
+gems:
+  - jekyll-mentions
+  - jekyll-sitemap
+  - jekyll-feed
+  - jekyll-gist
+  - jekyll-paginate
+  - github-pages
+
+paginate: 6
+paginate_path: "/posts/page:num/"
+
+jekyll-mentions:
+  base_url: https://github.com
+
+
+# Exclude list
+exclude: [README.md, Gemfile, Gemfile.lock, node_modules, gulpfile.js, package.json, _site, .bundle, src, vendor, CNAME, LICENSE, Rakefile, old]
