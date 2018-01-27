@@ -37,6 +37,7 @@ phone: default
 email: fuchstraumer@gmail.com
 
 gems:
+  - github-pages
   - jekyll-mentions
   - jekyll-sitemap
   - jekyll-feed
