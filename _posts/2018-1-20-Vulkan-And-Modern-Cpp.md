@@ -56,6 +56,6 @@ Its not bad, and I already exist in a state of seething irritation with Nvidia s
 
 ### VulpesRender, and it's earliest iterations
 
-Coming hot off a CUDA course and learning how to use OpenGL's direct state access, I was quite excited to use Vulkan. Compute capabilities were guaranteed, and above all else there wasn't any state tracking! 
+Coming hot off a CUDA course and learning how to use OpenGL's direct state access, I was quite excited to use Vulkan. Compute capabilities were guaranteed, and above all else there wasn't any state tracking! But the first things a new user of Vulkan will encounter can scare them away just as quickly. Did you enjoy 2-3 lines of code to create a texture? Well, I hope you're ready to type literally as many as 100 lines of code to do the same in Vulkan.
 
-But the first things a new user of Vulkan will encounter can scare them away just as quickly. Did you enjoy 2-3 lines of code to create a texture? Well, I hope you're ready to type literally as many as 100 lines of code to do the same in Vulkan.
+The good news, however, is that such things are actually quite splendidly abstracted away once you get the infrastructure in place

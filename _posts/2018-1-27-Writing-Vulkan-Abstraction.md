@@ -40,3 +40,6 @@ Also, I probably have an issue with self-loathing. I started programming by lear
 going to learn Vulkan. People who care about themselves don't do these things.
 
 ## (Volcano Memes), or, diving into Vulkan
+
+One of the problems that is still somewhat present is the comparative lack of resources compared to the much
+more established APIs like DX9 and OpenGL. The best resource is the red book equivalent for Vulkan - 
