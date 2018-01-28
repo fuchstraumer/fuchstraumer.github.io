@@ -4282,10 +4282,6 @@ cite {
   vertical-align: middle;
 }
 
-.post .entry_content img {
-  width: 100%;
-  vertical-align: middle;
-}
 
 .post header .post_description {
   position: absolute;
@@ -4313,6 +4309,13 @@ cite {
 
 .post .entry_content {
   padding-bottom: 2rem;
+}
+
+.post .entry_content img {
+  max-width: 900px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .post_footer {
