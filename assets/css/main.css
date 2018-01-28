@@ -4150,6 +4150,14 @@ cite {
   color: #6e6e6e;
 }
 
+.tag_page {
+  position: relative;
+  background-image: url(../img/bg_tags.jpg);
+  background-size: cover;
+  background-position: 50% 50%;
+  background-repeat: no-repeat;
+}
+
 .top {
   position: fixed;
   bottom: 25px;
@@ -4576,14 +4584,13 @@ cite {
 }
 
 .about .author .author_image {
-  float: none;
   display: block;
-  margin: 0 auto 1.75rem;
+  margin-left: 1rem;
 }
 
 .about .author .author_info {
-  padding: 0;
-  text-align: center;
+  padding: 10px;
+  text-align: left;
 }
 
 .about .about_social {
