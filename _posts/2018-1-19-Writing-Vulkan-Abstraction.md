@@ -1,6 +1,6 @@
 ---
 layout: post
-date: 2018-1-27
+date: 2018-1-19
 title: "Designing, Building, and Using a Vulkan abstraction layer"
 img: pinnacle.jpg
 tags: [Vulkan,C++,Design,Libraries, Modern C++]

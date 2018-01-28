@@ -10,7 +10,7 @@ url: "https://fuchstraumer.github.io" # the base hostname & protocol for your si
 # Banner settings
 video: mountains.mp4 # add banner video. Add your video file to the folder video
 banner-title: Fox Noises
-banner-desc: Graphics Programming and Space Stuff
+banner-desc: Graphics Programming, Procedural Generation, Music, and Space Stuff
 
 # Author settings
 author-pic: avatar.jpg # your photo
@@ -29,7 +29,7 @@ discus_identifier: fuchstraumer # add your discus identifier
 analytics: UA-30324363-1 
 
 # Paginate
-paginate: 12
+paginate: 6
 paginate_path: /page:num/
 
 # Build settings
