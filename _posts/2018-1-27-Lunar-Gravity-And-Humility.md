@@ -1,8 +1,8 @@
 ---
 layout: post
-date: 2018-01-28
+date: 2018-01-27
 title: "Lunar Gravity Models and a lesson in Humility"
-published: false
+published: true
 img: moon.jpg
 tag: [Space, NASA, Legacy Code, C++, Spherical Harmonics]
 ---

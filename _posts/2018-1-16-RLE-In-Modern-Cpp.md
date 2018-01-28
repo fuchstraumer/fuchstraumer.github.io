@@ -2,7 +2,7 @@
 layout: post
 date: 2018-01-22 12:55:00 +0300
 title: "Run-Length Encoding in Modern C++"
-img: himalayan.jpg # Add image post (optional)
+img: spider_meadows.jpg # Add image post (optional)
 tags: [C++, Modern, Modern C++, Utilities, Code, Standalone]
 ---
 
