@@ -4282,6 +4282,11 @@ cite {
   vertical-align: middle;
 }
 
+.post .entry_content img {
+  width: 100%;
+  vertical-align: middle;
+}
+
 .post header .post_description {
   position: absolute;
   left: 0;
