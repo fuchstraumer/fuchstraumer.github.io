@@ -1,4 +1,5 @@
 @charset "UTF-8";
+@import url('https://fonts.googleapis.com/css?family=Ubuntu|Ubuntu+Mono');
 /*! normalize.css v7.0.0 | MIT License | github.com/necolas/normalize.css */
 /* Document
    ========================================================================== */
@@ -85,7 +86,7 @@ hr {
  * 2. Correct the odd `em` font sizing in all browsers.
  */
 pre {
-  font-family: monospace, monospace;
+  font-family: 'Ubuntu Mono', monospace;
   /* 1 */
   font-size: 1em;
   /* 2 */
@@ -140,7 +141,7 @@ strong {
 code,
 kbd,
 samp {
-  font-family: monospace, monospace;
+  font-family: 'Ubuntu Mono', monospace;
   /* 1 */
   font-size: 1em;
   /* 2 */
@@ -231,7 +232,7 @@ input,
 optgroup,
 select,
 textarea {
-  font-family: sans-serif;
+  font-family: 'Ubuntu', sans-serif;
   /* 1 */
   font-size: 100%;
   /* 1 */
@@ -3848,7 +3849,7 @@ template {
 }
 
 body {
-  font-family: "Lato", sans-serif;
+  font-family: "Ubuntu", sans-serif;
   -webkit-font-smoothing: antialiased;
   background-color: #262626;
   margin: 0;
@@ -3931,7 +3932,7 @@ cite {
 }
 
 .main_header {
-  padding: 2rem;
+  padding: 1rem;
   display: -webkit-box;
   display: -webkit-flex;
   display: -ms-flexbox;
@@ -3957,14 +3958,14 @@ cite {
 }
 
 .main_header .logo span {
-  color: #c0334a;
+  color: #f58634;
   font-weight: 400;
 }
 
 .main_header nav a {
   color: #ffffff;
   text-decoration: none;
-  margin-left: 2rem;
+  margin-left: 1rem;
 }
 
 #banner {
@@ -3983,6 +3984,11 @@ cite {
 #banner .content .title {
   font-size: 3.5rem;
   margin: 0 0 1rem 0;
+}
+
+#banner .content .title span {
+  color: #f58634;
+  font-weight: 400;
 }
 
 #banner .content .sub_title {
