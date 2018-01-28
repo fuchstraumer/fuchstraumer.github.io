@@ -10,7 +10,9 @@ tag: [Vulkan, C++, Programming, Graphics, Graphics API, General]
 I have a number of family members, friends, and associates who either:
 
 - Don't program at all
+
 - Don't do graphics programming
+
 - Know only surface-level details about graphics topics
 
 In this post, I'm hoping to do a broad walk-through of graphics "stuff", 
@@ -44,9 +46,13 @@ CPUs, and 4 is even becoming extremely common in mobile hardware.
 GPUs are really quite different, and it's hard to comprehend just *how* different 
 they really are. While CPUs (up until AMD's Ryzen series) tended to not feature 
 more than 4-8 threads, GPUs can have thousands of cores representing thousands of
-threads. Unlike the CPU though, these individual threads are much *much* less powerful.
+threads. Unlike the CPU though, these individual threads are much *much* less powerful. 
+In the graphic below, an "ALU" is an advanced logic unit - representing one core and usually
+one thread of execution that the CPU is capable of.
 
-The kitchen metaphor can still help us understand them, though. Whereas a CPU features 
+<img src="{{site.baseurl}}/assets/img/cpugpu.png" alt="ALU here being equivalent to a core/thread" />
+
+The kitchen metaphor can still help us understand GPUs, though. Whereas a CPU features 
 several chefs that are probably jumping around each performing their own complex individual
 tasks, a GPU is closer to a much bigger industrial kitchen with a number of stations,
 wherein each chef is much less skilled and is instead specialized at performing a few 
@@ -82,3 +88,15 @@ is still going to be very verbose and difficult. Plus, it would change based on 
 different manufacturers, versions, and series would all have slightly different ways of communicating.
 So, an API helps to remove this burden by standardizing the interface to the hardware. This way,
 code written via an API will work on any device that implements a "driver" for the API in question.
+
+### The "Graphics Pipeline"
+
+This topic is going to be where things start getting complex and hard to understand - even I still
+find myself struggling with many of these concepts. But, if you've lasted this long, you may find
+them interesting if nothing else. 
+
+While the GPU is highly parallel, it also still has to sequence it's operations - hence, the usage of
+a sort of "graphics pipeline". This is a series of steps the GPU will go through to render a single image
+(frame) to a screen, and the actions if performs in each step vary wildly. 
+
+<img src="{{site.baseurl}}/assets/img/vulkan_simplified_pipeline.png" alt="Still missing a few stages, but it'll do" width="284" height="643" />

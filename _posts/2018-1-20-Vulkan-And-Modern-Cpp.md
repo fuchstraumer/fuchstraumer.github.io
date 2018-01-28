@@ -25,19 +25,24 @@ There are so so many posts about this, so I'll avoid lingering on it. (Insert pe
 The Vulkan API itself is C, through and through, and this is good for a bunch of reasons and bad for a bunch of reasons. The good includes:
 
 - what you see is what you get, always
+
 - enums can be bitmasked together
+
 - C allows for other language bindings, yay C ABI!
+
 - start at a zero overhead dead-simple interface 
 
 The downsides, unsurprisingly, include:
 
 - unscoped enums can feel cluttered, fast 
+
 - also, holy enums. There are so many!
+
 - Handles with no lifetime tracking or RAII
 
 Nvidia tried to solve this with Vulkan-hpp, with the goal of lifetime tracking for handles, typesafe enums, and namespacing + classes + organizational tweaks. But I can sum up my feelings on that like so:
 
-![Might be channeling Torvalds](https://i.imgur.com/2qNqF2Y.jpg)
+<img src="https://i.imgur.com/2qNqF2Y.jpg" width="420px" height="350px" alt="Might be channeling Torvalds" />
 
 It didnt feel right to me, because:
 
