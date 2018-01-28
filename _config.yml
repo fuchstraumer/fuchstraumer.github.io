@@ -37,5 +37,6 @@ markdown: kramdown
 plugins:
   - jekyll-paginate
   - jekyll-sitemap
+  - jekyll_github_sample
 
 exclude: [README.md, Gemfile, Gemfile.lock, node_modules, gulpfile.js, package.json, _site, .bundle, src, vendor, CNAME, LICENSE, Rakefile, old]
