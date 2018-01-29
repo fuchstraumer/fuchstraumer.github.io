@@ -10,10 +10,18 @@
 }
 
 body {
-  font-family: "Lato", sans-serif;
+  font-family: $main_family;
   -webkit-font-smoothing: antialiased;
   background-color: $dark_gray;
   margin: 0;
+}
+
+code {
+  font-family: $mono-family;
+}
+
+h1,h2,h3,h4,h5,h6 {
+  font-family: $header-family;
 }
 
 p {
