@@ -4,3 +4,4 @@ gem "jekyll"
 gem "jekyll-sitemap"
 gem 'jekyll-paginate'
 gem 'jekyll_github_sample'
+gem 'jekyll-toc'
