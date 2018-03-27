@@ -118,23 +118,80 @@ struct ShaderResources {
 
 From this structure we can get all of the data we need to help us make pipeline setup quite a bit easier:
 `stage_inputs` and `stage_outputs` are our input/output attributes, and in the case of the Vertex shader
-retrieving the data from `stage_inputs` lets us generate the `VkVertexInputAttributeDescription` objects
-we need to create a pipeline.
+retrieving the data from `stage_inputs` lets us generate the input attribute objects we need to create a pipeline.
 
 The rest of the fields represent our various resource types, and usually a different `VkDescriptorType` value.
 When generating bindings, we have a fairly simple series of actions for retrieving the stuff we want - I'll 
 avoid making a particular example of that here, though, and instead just LINK to the section of my code dedicated to 
-doing just that.
+doing just that. Partially because things are about to get fairly detailed - turns out storing all the information
+we can possibly need is actually quite a bit of work!
+
+The parent object representing a single set and all of it's objects is the `DescriptorSetInfo` structure, which is fairly simple:
+{% highlight cpp %}
+struct DescriptorSetInfo {
+    uint32_t Index = std::numeric_limits<uint32_t>::max();
+    std::vector<DescriptorObject> Members = std::vector<DescriptorObject>();
+};
+{% endhighlight %}
+
+Each `DescriptorObject` stored in `Members` describes a single unique resource - and that structure itself also stores
+a bunch of important data:
+
+{% highlight cpp %}
+struct DescriptorObject {
+    std::string Name;
+    uint32_t Binding, ParentSet;
+    VkShaderStageFlags Stages;
+    VkDescriptorType Type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
+    std::vector<ShaderDataObject> Members;
+
+    bool operator==(const DescriptorObject& other);
+    bool operator<(const DescriptorObject& other);
+
+    explicit operator VkDescriptorSetLayoutBinding() const;
+    std::string GetType() const;
+    void SetType(std::string type_str);
+};
+{% endhighlight %}
+
+The fields mostly match the fields required to create a `VkDescriptorSetLayoutBinding` - `Name` is just a convienient thing
+to have when serializaing to JSON (more on that later!) and `Members` is used for objects like uniform buffers that have
+multiple unique data members (as for these, we can benefit from knowing their sizes and offsets).
 
 Okay, so we've reflected on our shaders and retrieved a bunch of useful info about stuff going on in those shaders.
 But there's still one last important step before we can get to using our generated data.
 
 #### Collating reflection data
 
-One of the unfortunate things about how spirv-cross handles generating reflection data is that shader stages have no
-concept of other shader stages - and since we could also potentially have different resources being used in different
-stages, we need to make sure to reflect on each stage individually.
+Initially, our `DescriptorSetInfo` objects are stored in a multimap (`std::unordered_multimap<VkShaderStageFlagBits, DescriptorSetInfo>`),
+allow for multiple descriptor sets per shader stage. We now want to reduce this map into a single vector of `DescriptorSetInfo` objects.
 
-To add to the fun, we also need to find resources used in multiple stages and `|` the bitfields for each stage a resource
-is used together in order to properly set the `stage` field of each descriptor object. So this all called for a rather 
-involved "sorting" stage.
+Our collation loop body then looks a little something like so:
+
+{% highlight cpp %}
+for (const auto& entry : descriptorSets) {
+    for (const auto& object : entry.second.Members) {
+        // Now iterating through each `DescriptorObject` stored in a 
+        // single `DescriptorSetInfo` structure
+    }
+}
+{% endhighlight %}
+
+Completely standard and nothing shocking here, but here comes the first little "gotcha" I encountered working on this: sometimes we can
+have descriptor sets bound at bindings `0` and `2`, but have nothing at index `1`. And our goal is to get everything into a single linear
+vector, so this requires carefully checking our binding index to make sure we won't index outside of the container (and if we would, we
+need to resize appropriately to make room):
+
+{% highlight cpp %}
+const uint32_t& set_idx = obj.ParentSet;
+if (set_idx + 1 > sortedSets.size()) {
+    sortedSets.resize(set_idx + 1);
+}
+{% endhighlight %}
+
+Okay, that's taken care of. But the same issue can occur again with the `Members` vector in `DescriptorSetInfo` - besides having a gap 
+in descriptor *set* bindings, we can also potentially have a gap in the *object* bindings too. So we get to perform the same check again:
+
+{% highlight cpp %}
+const uint32_t& binding_idx = obj.Binding;
+{% endhighlight %}
