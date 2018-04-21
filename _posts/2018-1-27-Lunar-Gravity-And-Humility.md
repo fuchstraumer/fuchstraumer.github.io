@@ -1,6 +1,6 @@
 ---
 layout: post
-date: 2018-02-02
+date: 2018-04-19
 title: "Lunar Gravity Models and a lesson in Humility"
 published: true
 img: moon.jpg
@@ -116,8 +116,9 @@ A_{G} = \frac{\mu}{r} + \sum_{n = 2}^{N} \sum_{m = 0}^{N}(P_{n}^{m}sin\theta)(C_
 \end{equation}
 
 An important note is that we actually _do_ still use that simplified formula we mentioned earlier. That's the base quantity of gravitational force
-we can expect to find around a body, and that doesn't really change much. The spherical harmonic quantites help us fine-tune our guess though. Let's
-break down this equation a bit more, though.
+we can expect to find around a body, and that doesn't really change much. The spherical harmonic quantites help us fine-tune our calculations to account
+for the minor variations in mass-density of most planetary bodies, and accounting for these minor changes is extremely important in the case of the moon
+as it has so many variations (some of which really are _not_ that minor at all). Let's break down this equation a bit more, though.
 
 ## Spherical Harmonic Geopotential models
 
@@ -144,6 +145,24 @@ In the case of the moon, the data tables go out to degree and order 900 - a rath
 order and degree 270, as that is already 36,000+ lines of coefficient data to read in from a file, and then to store in RAM (and also to facilitate fast access
 to from multiple threads...). The coefficients are then retrieved by indexing into these tables for a given $$n$$ and $$m$$ and retrieving the relevant
 coefficients.
+
+$$cos(m\varphi)$$ and $$sin(m\varphi)$$ are part of that core inner loop - here, $$\varphi$$ represents the lattitude of our body expressed in body-fixed coordinates
+(body-fixed meaning that if we're around the moon, our measurements are all done relative to a non-rotating frame fixed on the moon). $$sin(\theta)$$ is the $$sin$$ of
+our longitude in turn, and our last measurement $$r$$ is used in the outermost calculation (done only once). This simply represents the radial distance of our body from the
+center of our influencing body (unsurprisingly). These variables are all fairly easily calculated from the conventional `(x,y,z)` cartesian coordinates we work with elsewhere
+in our simulation, however.
+
+The last major element of note is $$P_{n}^{m}$$, representing the "associated Legendere polynomial". This is where my lack of (complete, at least) college education really begins to show
+but I'll attempt to do my best at explaining how this works. Effectively, this equation occurs when solving Laplace's equation in spherical coordinates - Laplace's equation often comes up
+in this field as it can be used to accurately describe the behavior of gravitational potential fields, particularly in relation to their "shape". 
+
+The associated Legendere polynomials are the canonical (somewhat akin to "standardized") solutions of the Legendere polynomials, in particular relating a degree and order value to their 
+solutions and the fact that they can rather perfectly describe the solution to partial differential equations taken along the surface of a sphere.
+
+## Computing Spherical Harmonic Geopotential models
+
+In computing these models, we will often make some assumptions and simplifications to make them more easy to compute. In particular, some of the calculations can be "extracted" from the inner
+loops and calculated once when setting up a calculation
 
 ## Humility
 
