@@ -2,7 +2,7 @@
 layout: post
 date: 2018-04-19
 title: "Lunar Gravity Models and a lesson in Humility"
-published: true
+published: false
 img: moon.jpg
 tag: [Space, NASA, Legacy Code, C++, Spherical Harmonics]
 ---
@@ -146,7 +146,7 @@ order and degree 270, as that is already 36,000+ lines of coefficient data to re
 to from multiple threads...). The coefficients are then retrieved by indexing into these tables for a given $$n$$ and $$m$$ and retrieving the relevant
 coefficients.
 
-$$cos(m\varphi)$$ and $$sin(m\varphi)$$ are part of that core inner loop - here, $$\varphi$$ represents the lattitude of our body expressed in body-fixed coordinates
+$$cos(m\varphi)$$ and $$sin(m\varphi)$$ are part of that core inner loop - here, $$\varphi$$ represents the lattitude of our satellite expressed in body-fixed coordinates
 (body-fixed meaning that if we're around the moon, our measurements are all done relative to a non-rotating frame fixed on the moon). $$sin(\theta)$$ is the $$sin$$ of
 our longitude in turn, and our last measurement $$r$$ is used in the outermost calculation (done only once). This simply represents the radial distance of our body from the
 center of our influencing body (unsurprisingly). These variables are all fairly easily calculated from the conventional `(x,y,z)` cartesian coordinates we work with elsewhere
@@ -158,11 +158,6 @@ in this field as it can be used to accurately describe the behavior of gravitati
 
 The associated Legendere polynomials are the canonical (somewhat akin to "standardized") solutions of the Legendere polynomials, in particular relating a degree and order value to their 
 solutions and the fact that they can rather perfectly describe the solution to partial differential equations taken along the surface of a sphere.
-
-## Computing Spherical Harmonic Geopotential models
-
-In computing these models, we will often make some assumptions and simplifications to make them more easy to compute. In particular, some of the calculations can be "extracted" from the inner
-loops and calculated once when setting up a calculation
 
 ## Humility
 
