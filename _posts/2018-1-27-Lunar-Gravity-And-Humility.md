@@ -2,7 +2,7 @@
 layout: post
 date: 2018-04-19
 title: "Lunar Gravity Models and a lesson in Humility"
-published: false
+published: true
 img: moon.jpg
 tag: [Space, NASA, Legacy Code, C++, Spherical Harmonics]
 ---
@@ -158,6 +158,8 @@ in this field as it can be used to accurately describe the behavior of gravitati
 
 The associated Legendere polynomials are the canonical (somewhat akin to "standardized") solutions of the Legendere polynomials, in particular relating a degree and order value to their 
 solutions and the fact that they can rather perfectly describe the solution to partial differential equations taken along the surface of a sphere.
+
+We use those to help us find the small mass-density variations that affect our final geopotential result, and since we're iterating through a spherical harmonic series of variying degree/order, increasing the degree and order just results in us taking more and more infitisemal chunks of the body in question. Its like a "detail" level, so-to-speak. 
 
 ## Humility
 
