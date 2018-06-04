@@ -18,7 +18,7 @@ Regardless, in this post I'd like to walk through Vulkan a bit. Think of it as a
 and educate those who haven't used this API about it's various elements, realities, and details. It's not substitute
 for actually using the API, but I hope it might help prime one's brain with some introductory knowledge and ideas!
 
-# The Origin Story 
+## The Origin Story 
 
 I chose to start learning Vulkan after I was having issues getting CUDA and OpenGL to play nice -
 I was at the time generating procedural noise using CUDA, and even my (in hindsight) naive and suboptimal
@@ -52,7 +52,7 @@ shim is probably next (and may appear sooner than we expect).
 Also, I probably have an issue with self-loathing. I started programming by learning C++ and then decided I was 
 going to learn Vulkan. Healthy people don't do these things ;)
 
-# Vulkan objects - common traits
+## Vulkan objects - common traits
 
 Most objects in Vulkan take some kind of `createInfo` structure pointer in their creation functions. These structures specify 
 various attributes of the object that won't (usually) be allowed to change during use. Some of these are simple attributes that 
@@ -74,7 +74,7 @@ Creation and destruction functions also take a `VkAllocationCallbacks*` paramete
 memory allocation functions to use for CPU-side resources. I've not yet seen a major need for this, and honestly have it forced to `nullptr`
 in most of my code (though that's something I'd like to change soon). If anyone has seen a major benefit to using these, please let me know. 
 
-# The Core Vulkan objects
+## The Core Vulkan objects
 
 ### The Instance
 
@@ -163,7 +163,7 @@ and it's also another place where we enable certain extensions at a device-level
 (i.e, enable) for the logical device we're creating (still limited by the physical device's maximum) and create an array of priorities for each queue -
 letting us break down in even more detail how queue submissions are handled. This usually isn't necessary, however.
 
-# How well can Vulkan be multithreaded and parallelized?
+## How well can Vulkan be multithreaded and parallelized?
 
 In short, positively. In OpenGL, threading required complex juggling of OpenGL contexts - somewhat akin to the previous three classes all tied together. But 
 resources on one thread really belonged to a given context so ownership had to be handled carefully and usually required extensions like direct state access 
@@ -175,7 +175,7 @@ Whereas OpenGL is a series of streets with a sophisticated array of traffic ligh
 That does, however, mean that the burden of constructing all this synchronization and safety infrastructure now falls on us as users of the API. If nothing 
 else, the best news is that we don't need to fight the APIs entire history, legacy, and design to use multithreading.
 
-# Vulkan resources 
+## Vulkan resources 
 
 In OpenGL resource management entailed tracking state, like what vertex buffer or element buffer we had bound at any one moment and making sure we had the
 right binding set before adjusting a resources parameters or variables. Thankfully, that's all gone in Vulkan. Unfortunately, we gain a new set of 
@@ -185,7 +185,12 @@ is probably used to coming from OpenGL.
 ### Buffers and Images
 
 `VkBuffer`s and `VkImage`s will most likely be the resources one uses the most, and they are quite different (in good ways!) from how OpenGL handles the 
-notion of these kinds of resources. 
+notion of these kinds of resources. First, both resources can have their usage precisely specified through mixtures of the [`VkBufferUsageFlags`](https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferUsageFlagBits.html)  and [`VkImageUsageFlags`](https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkImageUsageFlagBits.html), respectively. A buffer that we're going to use as a vertex 
+buffer gets created with the `VK_BUFFER_USAGE_VERTEX_BUFFER_BIT` flag set, and an image we're going to use for sampling in a shader gets 
+`VK_IMAGE_USAGE_SAMPLED_BIT` set.
+
+These items are still "stored" mostly in unsigned integer handles, but there's still a lot more to each resource: instead of selecting and modifying 
+these objects by flipping levers and pressing buttons in the state machine though, we are able to set most of these properties up-front.
 
 ### Buffer and Image views
 
