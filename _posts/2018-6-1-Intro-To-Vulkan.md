@@ -165,26 +165,32 @@ letting us break down in even more detail how queue submissions are handled. Thi
 
 ## How well can Vulkan be multithreaded and parallelized?
 
-In short, positively. In OpenGL, threading required complex juggling of OpenGL contexts - somewhat akin to the previous three classes all tied together. But 
-resources on one thread really belonged to a given context so ownership had to be handled carefully and usually required extensions like direct state access 
-and bindless textures (do correct me if I'm wrong, I moved to Vulkan before exploring this). In Vulkan, we don't even have to leave the scope of the logical 
-device to get powerful with multithreading: memory allocation, command submission to queues, resource formatting, command recording, and more can all be 
-multithreaded.
+In short, easily- compared to previous APIs. In OpenGL, threading required complex juggling of OpenGL contexts - somewhat akin to the previous three classes 
+all tied together. But resources on one thread really belonged to a given context so ownership had to be handled carefully and usually required extensions 
+like direct state access and bindless textures (do correct me if I'm wrong, I moved to Vulkan before *really* exploring this). In Vulkan, we don't even have 
+to leave the scope of the logical device to get powerful with multithreading: memory allocation, command submission to queues, resource formatting, command 
+recording, and more can all be multithreaded.
 
 Whereas OpenGL is a series of streets with a sophisticated array of traffic lights, checks, and traffic management systems Vulkan feels like the open road. 
 That does, however, mean that the burden of constructing all this synchronization and safety infrastructure now falls on us as users of the API. If nothing 
-else, the best news is that we don't need to fight the APIs entire history, legacy, and design to use multithreading.
+else, the best news is that we don't need to fight the APIs entire history, legacy, and design to use multithreading. 
+
+We'll cover synchronization primitives at the end, and some of those can be used to guard against threading issues and hiccups. I'd like to write another post,
+however, on the topic as I need to explore it more thoroughly myself. The most apparent (and easiest) way to multithread is just recording rendering commands
+on a number of threads: one can have "secondary" command buffers that are then executed by a "primary" command buffer. So, a number of threads can be 
+dispatched each with their own secondary command buffer to record into. Once these threads are finished and have all been joined back together, we can gather
+these secondary command buffers and have them be executed + submitted to a graphics queue from the main rendering thread.
 
 ## Vulkan resources 
 
 In OpenGL resource management entailed tracking state, like what vertex buffer or element buffer we had bound at any one moment and making sure we had the
 right binding set before adjusting a resources parameters or variables. Thankfully, that's all gone in Vulkan. Unfortunately, we gain a new set of 
 responsibilities as we have to manage lifetime, memory, and things like usage flags instead. Memory management is on another level, compared to what one
-is probably used to coming from OpenGL.
+is probably used to coming from OpenGL. And I'm not even really going to be able to dive into sparse resources here, either.
 
 ### Buffers and Images
 
-`VkBuffer`s and `VkImage`s will most likely be the resources one uses the most, and they are quite different (in good ways!) from how OpenGL handles the 
+`VkBuffer` and `VkImage` will most likely be the resources one uses the most, and they are quite different (in good ways!) from how OpenGL handles the 
 notion of these kinds of resources. First, both resources can have their usage precisely specified through mixtures of the [`VkBufferUsageFlags`](https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferUsageFlagBits.html)  and [`VkImageUsageFlags`](https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkImageUsageFlagBits.html), respectively. A buffer that we're going to use as a vertex 
 buffer gets created with the `VK_BUFFER_USAGE_VERTEX_BUFFER_BIT` flag set, and an image we're going to use for sampling in a shader gets 
 `VK_IMAGE_USAGE_SAMPLED_BIT` set.
@@ -192,16 +198,110 @@ buffer gets created with the `VK_BUFFER_USAGE_VERTEX_BUFFER_BIT` flag set, and a
 These items are still "stored" mostly in unsigned integer handles, but there's still a lot more to each resource: instead of selecting and modifying 
 these objects by flipping levers and pressing buttons in the state machine though, we are able to set most of these properties up-front.
 
+#### VkBuffer
+
+Buffers are the simplest type of Vulkan resource we can create, which is reflected in the complexity of their particular `createInfo` structure. They are 
+used to store linear or unstructured data, and don't really have a set format (though they can be viewed as a particular format - more on that later). This
+is what you will load data into for use in shaders, usually: be it vertex, index, uniform, or mutable compute datasets (or just empty buffers to output compute
+results into).
+
+#### VkImage
+
+Images are considerably more complex: they require a lot more information to be passed into Vulkan upon creation, and so we'll take the time to break this down
+and explain a bit about some of the fields in their `createInfo` structure:
+
+{% highlight cpp %}
+typedef struct VkImageCreateInfo {
+    VkStructureType sType;
+    const void* pNext;
+    VkImageCreateFlags flags;
+    VkImageType imageType;
+    VkFormat format;
+    VkExtent3D extent;
+    uint32_t mipLevels;
+    uint32_t arrayLayers;
+    VkSampleCountFlagBits samples;
+    VkImageTiling tiling;
+    VkImageUsageFlags usage;
+    VkSharingMode sharingMode;
+    uint32_t queueFamilyIndexCount;
+    const uint32_t* pQueueFamilyIndices;
+    VkImageLayout initialLayout;
+};
+{% endhighlight %}
+
 ### Buffer and Image views
 
-### Backing memory
+While a `VkBuffer` or `VkImage` handle represents the more "raw" object itself, and is usually tied to some sort of backing memory as well, `VkBufferView` and 
+`VkImageView` objects are used 
 
-### Memory flags and memory residency
+### Samplers
 
-# The Swapchain
+### Shader Modules
 
-# RenderPasses
+## Device Memory
 
-# GraphicsPipelines
+### Memory residency and types
 
-# SPIR-V shaders
+### Allocating and Binding memory
+
+Allocating and using memory in Vulkan has two distinct steps: the creation step, wherein we request a new chunk of memory from the GPU and "attach" it 
+(so-to-speak) to a new `VkDeviceMemory` handle, and the binding step in which we tie together a resource (`VkBuffer`/`VkImage`) to a region of memory.
+
+### Best Practices (briefly)
+
+## Using Resources - Descriptors
+
+In order to use Vulkan resources in shaders, we must attach them to "descriptors". This ends up acting like a more static version of OpenGL's getting/setting
+of uniform locations and variables, and it's probably one of the hardest concepts to grasp and begin working with as a new user of the Vulkan API. 
+
+### DescriptorSets
+
+### DescriptorSetLayouts
+
+### DescriptorPools
+
+## Pipelines
+
+### Graphics Pipeline Creation
+
+### Pipeline Cache Objects
+
+A `VkPipelineCache` can be passed to the creation function for pipelines, and will be used to accelerate pipeline creation when possible. This is 
+*especially* important on Mac OSX w/ MoltenVK: the pipeline creation step usually involves some kind of code generation and shader compiliation, but
+when using MoltenVK its when the SPIR-V binary blobs attached to a pipeline are converted to Metal shader code. This generated shader code is then 
+stored/attached to the pipeline cache object, and can be used again when generating similar pipelines.
+
+One can take the mechanism further, caching results of pipeline creation across application executions by [saving the pipeline data to file](https://github.com/fuchstraumer/VulpesRender/blob/master/src/resource/PipelineCache.cpp#L128). Then, one 
+can later load this pipeline cache data back from the stored file data - passing through a verification step ([example](https://github.com/fuchstraumer/VulpesRender/blob/master/src/resource/PipelineCache.cpp#L60)) to verify the pipeline cache is valid according to a few
+important qualifiers - and the pre-existing data can be used as a base to build from or mutate from. You'll need some kind of UUID for this: I personally
+just pass a `size_t` "hash" code to the constructor. Currently I generate this UUID by hashing the `typeid` of whatever object is generating the pipeline
+object, but this is a dated idea based on my previous thoughts on renderer design. Ultimately, the UUID can be generated however the user desires.
+
+If you check my personal implementation of a pipeline cache object, you'll see the simplest way implement this behavior in C++: have the destructor of the 
+object automatically dump the pipeline cache contents to a file, and have the constructor search for pre-existing file to initialize the cache with. One can 
+also merge multiple caches together into one new `VkPipelineCache` handle, which can be especially useful if one is threading the generation of 
+multiple subtly varying pipeline objects.
+
+## The Swapchain
+
+One of the other entirely new responsibilities required of the application writer when using Vulkan is swapchain management - a responsibility that is usually
+not a consideration at all with other graphics APIs. 
+
+### Creation and Management
+
+#### Further reading
+
+### Presentation Surfaces
+
+### Framebuffers
+
+## RenderPasses
+
+### Subpasses
+
+## Queries
+
+## Synchronization
+
+There are three 
