@@ -186,7 +186,8 @@ these secondary command buffers and have them be executed + submitted to a graph
 In OpenGL resource management entailed tracking state, like what vertex buffer or element buffer we had bound at any one moment and making sure we had the
 right binding set before adjusting a resources parameters or variables. Thankfully, that's all gone in Vulkan. Unfortunately, we gain a new set of 
 responsibilities as we have to manage lifetime, memory, and things like usage flags instead. Memory management is on another level, compared to what one
-is probably used to coming from OpenGL. And I'm not even really going to be able to dive into sparse resources here, either.
+is probably used to coming from OpenGL. And I'm not even really going to be able to dive into sparse resources here, either (resources that don't have
+to be backed by memory at all times, only when requested/bound).
 
 ### Buffers and Images
 
@@ -229,6 +230,24 @@ typedef struct VkImageCreateInfo {
     VkImageLayout initialLayout;
 };
 {% endhighlight %}
+
+There's loads more information in this structure than we're normally used to even having attached to most objects in OpenGL: this is for the best though,
+as it helps the driver a ton and I've come to appreciate the clarity and verbosity the API requires when setting up objects.
+
+Things like `imageType`, `format`, and `extent` shouldn't be too hard to understand: we effectively already have these in older APIs. `tiling` is a new field,
+though: it specifies whether the image is stored in an "optimally tiled" format in memory, or in a "linearly tiled" format. Linearly tiled images and data
+are simple and can be interpreted by the host - it's just good ol fashioned data packing. Optimally tiled images are likely to be packed or stored in a special
+fashion, based on the current hardware - this can be especially beneficial with textures and image data though, since this storage tiling method may result
+in increased cache coherency or reduced texel fetch latency. Tiling depends on the format and our planned usage (the `usage` field, set as one or a number of 
+`VkImageUsageFlags`): we can then use a function like this one in VulpesRender to return the tiling for our image (we always try to return 
+`VK_IMAGE_TILING_OPTIMAL`, since it can be so beneficial).
+
+`sharingMode` (also present in `VkBufferCreateInfo`, but we skipped that structure) is used to potentially allow the usage of this image across multiple queue 
+families, concurrently - `VK_SHARING_MODE_EXCLUSIVE` says we will explicitly handle sharing across queue families ourself (thus not requiring any API work + 
+overhead). `VK_SHARING_MODE_CONCURRENT` says multiple families may be using this resource, in which case we need to specify how many queue families can be 
+using this resource and pass their indices as well.
+
+The last new field is `initialLayout`. 
 
 ### Buffer and Image views
 
