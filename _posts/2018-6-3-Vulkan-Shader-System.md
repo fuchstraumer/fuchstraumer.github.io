@@ -3,7 +3,7 @@ layout: post
 date: 2018-6-3
 title: "Creating a Vulkan Shader System"
 img: aurora.jpg
-published: false
+published: true
 tags: [Vulkan]
 ---
 
@@ -35,6 +35,7 @@ texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER
 texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, fc_flags, 4);
 texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, fc_flags, 5);
 texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, fc_flags, 6);
+texelBuffersLayout->Create();
 {% endhighlight %}
 
 Ew. And this is just for creating the layout information: later we have to also attach these same 7 bindings/objects to the descriptor set, using
@@ -56,12 +57,28 @@ an array of `VkVertexInputAttributeDescription`s too! Now we don't need to recom
 of code required to perform this setup process has been sharply reduced as well. It looks something like the following:
 
 {% highlight cpp %}
+st::ShaderReflector reflector("shader_binary.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 size_t num_bindings = 0;
-std::vector<VkDescriptorSetLayoutBinding> bindings;
+reflector->GetDescriptorBindings(&num_bindings, nullptr);
+std::vector<VkDescriptorSetLayoutBinding> bindings(num_bindings);
+reflector->GetDescriptorBindings(&num_bindings, bindings.data());
+// This is where we'd otherwise do what we did in the previous code snippet: add bindings one by one
+descriptorSetLayout->AddDescriptorBindings(bindings);
+descriptorSetLayout->Create();
 {% endhighlight %}
 
-I quickly realizing another problem though: in complex setups that use several passes/groups of shaders all sharing the same resources, we now have ot make
+I quickly realized another problem though: in complex setups that use several passes/groups of shaders all sharing the same resources, we now have ot make
 sure to copy chunks of code like the following between each shader, ensuring they're all the same and always up-to-date:
+
+{% highlight glsl %}
+layout (set = 2, binding = 0, r32ui) restrict uniform uimageBuffer lightCountTotal;
+layout (set = 2, binding = 1, r32ui) restrict uniform uimageBuffer lightBounds;
+layout (set = 2, binding = 2, r8ui) restrict uniform uimageBuffer Flags;
+layout (set = 2, binding = 3, r32ui) restrict uniform uimageBuffer lightList;
+layout (set = 2, binding = 4, r32ui) restrict uniform uimageBuffer lightCounts;
+layout (set = 2, binding = 5, r32ui) restrict uniform uimageBuffer lightCountOffsets;
+layout (set = 2, binding = 6, r32ui) restrict uniform uimageBuffer lightCountCompare;
+{% endhighlight %}
 
 Oh, no. This isn't good. We'll get to how I got around this next, after I explain a bit about why using `spirv-cross` led me to decide on making this
 project a shared library.
