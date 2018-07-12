@@ -3,7 +3,7 @@ layout: post
 date: 2018-6-3
 title: "Creating a Vulkan Shader System"
 img: aurora.jpg
-published: false
+published: true
 tags: [Vulkan]
 ---
 
@@ -56,19 +56,36 @@ an array of `VkVertexInputAttributeDescription`s too! Now we don't need to recom
 of code required to perform this setup process has been sharply reduced as well. It looks something like the following:
 
 {% highlight cpp %}
-size_t num_bindings = 0;
-std::vector<VkDescriptorSetLayoutBinding> bindings;
+const size_t num_descriptor_sets = reflectionSystem->GetNumDescriptorSets();
+std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings(num_descriptor_sets);
+for (size_t i = 0; i < num_descriptor_sets; ++i) {
+    size_t num_bindings = 0;
+    reflectionSystem->GetLayoutBindings(i, &num_bindings, nullptr);
+    setBindings[i].resize(num_bindings);
+    reflectionSystem->GetLayoutBindings(i, &num_bindings, setBindings[i].data());
+}
+// assuming we have some VkDescriptorSetLayout wrapper class, we then just add the bindings:
+ourDescriptorSetLayout.AddSetLayoutBindings(setBindings[0]);
 {% endhighlight %}
 
-I quickly realizing another problem though: in complex setups that use several passes/groups of shaders all sharing the same resources, we now have ot make
+I quickly realizing another problem though: in complex setups that use several passes/groups of shaders all sharing the same resources, we now have to make
 sure to copy chunks of code like the following between each shader, ensuring they're all the same and always up-to-date:
+
+{% highlight glsl %}
+layout (set = 1, binding = 1, rgba32f) uniform imageBuffer positionRanges;
+layout (set = 1, binding = 2, rgba8) uniform imageBuffer lightColors;
+layout (set = 0, binding = 0, r8ui) uniform uimageBuffer flags;
+layout (set = 0, binding = 2, r32ui) uniform uimageBuffer lightCounts;
+layout (set = 0, binding = 4, r32ui) uniform uimageBuffer lightCountOffsets;
+layout (set = 0, binding = 5, r32ui) uniform uimageBuffer lightList;
+{% endhighlight %}
 
 Oh, no. This isn't good. We'll get to how I got around this next, after I explain a bit about why using `spirv-cross` led me to decide on making this
 project a shared library.
 
 #### The DLL Decision
 
-The downside of the SPIR-V ecosystem right now is that it kinda tends to drag in a whole boatload of dependency: ShaderTools has something like 7 linked-in
+The downside of the SPIR-V ecosystem right now is that it kinda tends to drag in a whole boatload of dependencies: ShaderTools has something like 7 linked-in
 dependencies if I recall correctly. This is quite a bit to link in, and they have a fairly large amount of headers attached to (so it begins to clutter the
 browse/intellisense databases of your IDE) - so in order to hopefully compartmentalize things, I decided to make this my first proper attempt at making a 
 shared library. That way, all the static libraries required for the SPIR-V stuff could be fully linked in without requiring anything of the client, and I could
@@ -84,9 +101,12 @@ my rather heavyweight renderer is a considerable plus, too.
 
 ### Shader Generation - how not to do it
 
-So, before out little sidebar I was just mentioning that maintaining parity of resource binding declarations across several shaders was really not a fun
+So, before our little sidebar I was just mentioning that maintaining parity of resource binding declarations across several shaders was really not a fun
 thing to have to do. In order to get around it, we'll clearly need some kind of generative shader system: and I had been wondering about creating this
 sort of system anyways, since I wanted to be able to generate shader permutations for different hardware and API capabilities.
+
+So I began implementing a generative shader system - and while it worked, the initial method I used was anything but pretty. Things that would be processed
+were all declared with `#pragma` - or sometimes an all-caps keyword prefixed with `$`. 
 
 ### Resource Groups
 
