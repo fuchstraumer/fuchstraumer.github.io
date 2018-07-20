@@ -232,7 +232,17 @@ potentially have threads in a detached state just running away into nowhere. Her
 a `std::lock_guard` - a `std::unique_lock` also will release the mutex once it exits scope, but unlike a guard we can explicitly unlock
 the attached mutex once we are done with it. Additionally, `std::condition_variable` just takes it as an argument for `wait()`.
 
-Note that the wait function
+To summarize what's going on here: we release the lock once we call `cVar.wait()` - but the current thread is blocked (so, our worker
+thread) and adds itself to a list of threads waiting on `cVar`. The thread is unblocked, as mentioned, when we call one of the condition
+variables notify functions - in this case, we use the supplied lambda function to check some conditions and make sure we _actually_ should
+have awoken.
+
+If the condition returns true, the thread unblocks and continues execution. Here, we unblock if we're shutting down - so we can exit execution
+fully - or because there are requests for us to process. If there are requests to process we pop a request from the queue and grab a factory function
+pointer. Once we've done that, we unlock the lock so that other threads can potentially acquire it.
+
+From there, it's just a matter of executing the two function pointers we have. I will admit here that I'm not sure how to handle having more than one
+thread - as it's possible that a user could request data from the asset we have currently queue to load.
 
 ##### Potential Issues and Fixes When Using Multiple Threads
 
