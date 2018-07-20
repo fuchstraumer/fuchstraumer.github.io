@@ -33,7 +33,7 @@ option:
 {% highlight cpp %}
 class AssetLoader {
 public:
-    `LoadedData` LoadFile(const char* fname);
+    LoadedData LoadFile(const char* fname);
 };
 {% endhighlight %}
 
@@ -54,7 +54,9 @@ can be used here: the factory pattern!
 class AssetLoader {
 public:
     using FactoryFunctor = void*(*)(const char* fname);
+    using SignalFunctor = void(*)(void* loaded_data);
     void Subscribe(const char* file_type, FactoryFunctor func);
+    void Load(const char* file_type, const char* fname, SignalFunctor fn);
 };
 // Client code 
 
@@ -116,7 +118,7 @@ struct ResourceData {
 };
 {% endhighlight %}
 
-But wait, how do we delete a `void*`? This is going to undefined behavior, as there's no destructor for a `void*`. And
+But wait, how do we delete a `void*`? This is going to be undefined behavior, as there's no destructor for a `void*`. And
 it's _very_ likely we'll have significant quantities of data attached to a loaded asset that we do want to make sure
 are properly destroyed and released from memory.
 
@@ -132,7 +134,8 @@ public:
 };
 {% endhighlight %}
 
-Then, the client code implementing this destructor becomes trivial:
+Then, the client code implementing this delete function becomes trivial (as a bonus, I imagine either generating these functions via a script or
+via templates/virtual classes would be rather easy, too!):
 
 {% highlight cpp %}
 static void* LoadObjFile(const char* fname) {
@@ -161,11 +164,43 @@ Take the ObjModel example in [VulpesSceneKit](https://github.com/fuchstraumer/Vu
 In that case, we load a bunch of data from disk then try to reduce duplicated vertices in the loaded data, making sure 
 that we only end up storing and using unique vertices (note - this is nearly directly copied from how Overv does it in
 his excellent [Vulkan Tutorial series](https://vulkan-tutorial.com/)). This helps reduce RAM usage while loading/staging the asset,
-and reduces VRAM usage (and potentially the expense of drawing the object, as well). 
-
-So, this turns out to be something we don't want to block the main thread with at all. And pretty quickly, it seems like we
-end up with a producer-consumer setup - the producer will be the Load function called by clients, and the consumers (potentially
+and reduces VRAM usage (and potentially the expense of drawing the object, as well). It seems like we are heading towards a 
+producer-consumer setup - the producer will be the Load function called by clients, and the consumers (potentially
 multiple, as I don't think one thread will be enough here) will be the threads executing the load functions.
+
+Let's create a `loadRequest` structure to use internally, holding everything we need to load data on a separate thread:
+
+{% highlight cpp %}
+struct loadRequest {
+    loadRequest(ResourceData& dest) : destinationData(dest) {}
+    ResourceData& destinationData;
+    SignalFunctor signal;
+};
+{% endhighlight %}
+
+I chose the constructor as I didn't want to copy the `ResourceData` structure into another thread, and because we should only
+be modifying one member of that object in the other thread, anyways. We'll then do the following when a user calls `Load()`. 
+I chose to copy the two function pointers, though: FactoryFunctor 
+
+{% highlight cpp %}
+void ResourceLoader::Load(const char* file_type, const char* file_path, SignalFunctor signal)
+    ResourceData data;      
+    data.FileType = file_type;
+    data.AbsoluteFilePath = absolute_path;
+    data.RefCount = 1;
+    auto iter = resources.emplace(absolute_path, data);
+
+    loadRequest req(iter.first->second);
+    req.requester = _requester;
+    req.signal = signal;
+    {
+        std::unique_lock<std::recursive_mutex> guard(queueMutex);
+        requests.push_back(req);
+        guard.unlock();
+    }
+    cVar.notify_one();
+}
+{% endhighlight %}
 
 
 
