@@ -3,11 +3,11 @@ layout: post
 date: 2018-7-20
 title: "Making an Asset Loader Plugin in C++"
 img: brick_mountains.jpg
-published: true
+published: false
 tags: [C++, Engine Development, Vulkan, Plugins]
 ---
 
-# Creating a Threaded Asset Loading Plugin in C++
+# Creating an Asset Loading Plugin in C++
 
 It will be a common task in an engine - or any sort of application, really, to load
 data from disk. And there are a number of things we'll want this system to be able to
@@ -25,7 +25,7 @@ plugin in [VulpesSceneKit](https://github.com/fuchstraumer/VulpesSceneKit). So w
 functions, pass user types (or library types) across the plugin/DLL boundary, or use templates. This
 causes some design difficulties from the very start.
 
-#### Loading Unique Data Types
+### Loading Unique Data Types
 
 Let's start from the very basics, forgetting for a moment that a DLL would already dismiss this as an
 option:
@@ -73,7 +73,7 @@ Okay, this is starting to come together! We'll return a `void*`, and pass that `
 signal function. Inside that function, we can use a cast to cast into whatever type we want (e.g, `CompressedTextureData`)
 or something. This satisfies requirement 1 already, so let's try requirement 2.
 
-#### Storing Loaded Data, and Avoiding Re-Loading
+### Storing Loaded Data, and Avoiding Re-Loading
 
 The approach to this isn't too wild - we'll keep the `void*` stored in our asset loader, most likely in a map mapping
 the filename to a data pointer. Then it'll be super easy to check if we've already loaded something, like so:
@@ -154,9 +154,9 @@ void VulkanScene::setupAssets() {
 
 Since we've casted to the correct type before calling `delete`, we now know for certain that the type will have it's 
 destructor called properly and can trust that things will be unloaded successfully. And by doing it like this, we
-can still keep our plugin strictly decoupled from any clients, which is a big advantage!
+can still keep our plugin strictly decoupled from any clients, which is a big advantage! Onto our next requirement, though.
 
-#### Thread the Loading Operations
+### Thread the Loading Operations
 
 Disk I/O can be an expensive operation, and it's also likely that users will want to post-process the data after loading.
 Take the ObjModel example in [VulpesSceneKit](https://github.com/fuchstraumer/VulpesSceneKit/blob/master/tests/plugin_tests/ResourceContextSceneTest/ObjModel.cpp), for example.
@@ -194,17 +194,55 @@ void ResourceLoader::Load(const char* file_type, const char* file_path, SignalFu
     req.requester = _requester;
     req.signal = signal;
     {
-        std::unique_lock<std::recursive_mutex> guard(queueMutex);
+        std::lock_guard<std::mutex> guard(queueMutex);
         requests.push_back(req);
-        guard.unlock();
     }
     cVar.notify_one();
 }
 {% endhighlight %}
 
+Here, we use a `std::lock_guard` and a `std::condition_variable` to implement our producer-consumer idiom: the consumer will wait on
+the condition variable until it is able to satisfy a condition, and checks the condition when notified by a call to `notify_one()`. So,
+we have the thread that is producing the requests acquire the mutex (to safely mutate the requests queue), add a request, then call
+notify a single waiting thread that there is potentially a request available (note that the mutex is implicitly released after we
+exit the scope it was declared in, thanks to the wondrous `std::lock_guard` <3).
+
+Our worker thread (or threads) is executing a function like so:
+
+{% highlight cpp %}
+void ResourceLoader::workerFunction() {
+    while (!shutdown) {
+        std::unique_lock<std::mutex> lock{queueMutex};
+        cVar.wait(lock, [this]()->bool { return shutdown || !requests.empty(); });
+        if (shutdown) {
+            return;
+        }
+        loadRequest request = requests.front();
+        requests.pop_front();
+        FactoryFunctor factory_fn = factories.at(request.destinationData.AbsoluteFilePath);
+        lock.unlock();
+        request.destinationData.Data = factory_fn(request.destinationData.AbsoluteFilePath.c_str());
+        request.signal(request.requester, request.destinationData.Data);
+    }
+}
+{% endhighlight %}
+
+`shutdown` is an atomic boolean used to get all threads to re-join when we are trying to shutdown/stop our system - otherwise we might
+potentially have threads in a detached state just running away into nowhere. Here, we are now using a `std::unique_lock` instead of
+a `std::lock_guard` - a `std::unique_lock` also will release the mutex once it exits scope, but unlike a guard we can explicitly unlock
+the attached mutex once we are done with it. Additionally, `std::condition_variable` just takes it as an argument for `wait()`.
+
+Note that the wait function
+
+##### Potential Issues and Fixes When Using Multiple Threads
+
+I quickly noted during my tests (running `ResourceContextSceneTest` in VulpesSceneKit) that attempting to join my two worker threads
+was failing on a deadlock. And behavior here became weird - calling `notify_all()` would cause a crash, as the notified thread would check
+requests and get an invalid value for `empty()` - as it's size had gone to the max for a `size_t`, and retrieving the first element
+caused a segfault. Which felt a little odd.
+
+### Call a User-Supplied "Signal" Function
 
 
-
-
-
+### Afterthoughts and Conclusion
 
