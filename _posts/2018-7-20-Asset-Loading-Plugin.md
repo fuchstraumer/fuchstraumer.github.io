@@ -129,6 +129,7 @@ pointer to our factory registration method:
 class AssetLoader {
 public:
     using FactoryFunctor = void*(*)(const char* fname);
+    using SignalFunctor = void(*)(void* loaded_data);
     using DeleteFunctor = void(*)(void* obj_instance);
     void Subscribe(const char* file_type, FactoryFunctor func, DeleteFunctor del_fn);
 };
@@ -241,18 +242,35 @@ If the condition returns true, the thread unblocks and continues execution. Here
 fully - or because there are requests for us to process. If there are requests to process we pop a request from the queue and grab a factory function
 pointer. Once we've done that, we unlock the lock so that other threads can potentially acquire it.
 
-From there, it's just a matter of executing the two function pointers we have. I will admit here that I'm not sure how to handle having more than one
-thread - as it's possible that a user could request data from the asset we have currently queue to load.
+From there, it's just a matter of executing the two function pointers we have. 
 
 ##### Potential Issues and Fixes When Using Multiple Threads
 
-I quickly noted during my tests (running `ResourceContextSceneTest` in VulpesSceneKit) that attempting to join my two worker threads
+I quickly noted during my tests (running `ResourceContextSceneTest` in VulpesSceneKit) that attempting to join my two worker threads (when stopping the system)
 was failing on a deadlock. And behavior here became weird - calling `notify_all()` would cause a crash, as the notified thread would check
 requests and get an invalid value for `empty()` - as it's size had gone to the max for a `size_t`, and retrieving the first element
-caused a segfault. Which felt a little odd.
+caused a segfault. Which felt a little odd. 
+
+I believe the issue related to not using a `std::recursive_mutex`: this object is able to propagate state across multiple threads competing for it, so switching
+to that plus adding another check for the `shutdown` flag (if true, we return immediately before executing further) seemed to fix the problem for now.
 
 ### Call a User-Supplied "Signal" Function
 
+Once out loading is complete, we're going to call the user supplied signal function - this lets the user process the data further in ways they see fit. In the case
+of loading (for example) a compressed texture from disk, this will be taking it from RAM and getting it into VRAM - along with performing the same for things like
+loaded `.obj` model data and the like. But there's a slight problem in our signal function signature that will quickly become apparent in-use:
+
+{% highlight cpp %}
+using SignalFunctor = void(*)(void* loaded_data);
+{% endhighlight %}
+
+The function signature assumes that we are either working with a static function, or a member function of the appropriate signature. The latter will probably be 
+common: I myself had some `ObjModel` class with a `FinalizeCreation(void* data)` function that I wanted to call - and quickly realized that wait a sec this won't
+work. We can't use member functions with our C-style interface, and the other option would be some less-than-ideal thing like:
+
+{% highlight cpp %}
+
+{% endhighlight %}
 
 ### Afterthoughts and Conclusion
 
