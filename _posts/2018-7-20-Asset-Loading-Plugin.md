@@ -269,8 +269,73 @@ common: I myself had some `ObjModel` class with a `FinalizeCreation(void* data)`
 work. We can't use member functions with our C-style interface, and the other option would be some less-than-ideal thing like:
 
 {% highlight cpp %}
+static ObjModel* currModelPtr = nullptr;
+static void FinalizeCreationStaticFn(void* data) {
+    currModelPtr->FinalizeCreation(data);
+}
 
+void main(int argc, char* argv[]) {
+    PluginManager& manager = PluginManager::GetPluginManager();
+    manager.LoadPlugin("resource_context.dll");
+    resource_api = reinterpret_cast<ResourceContext_API*>(manager.RetrieveAPI(RESOURCE_CONTEXT_API_ID));
+    // register our creation/destruction functions:
+    resource_api->RegisterFileTypeFactory("OBJ", &ResourceTestScene::LoadObjFile, &ResourceTestScene::DestroyObjFileData);
+    // doing our usual setup, etc, get to asset loading - but first need to set "currModelPtr"
+    currModelPtr = &ResourceTestScene.ObjModel;
+    // okay now we can load it
+    resource_api->LoadFile("OBJ", HouseObjFile.c_str(), FinalizeCreationStaticFn);
+}
 {% endhighlight %}
 
+Gross. For one, this just feels gross and bad. But it definitely can become bad: if we're loading multiple models, we now have to make sure to update that 
+static function pointer before each model is loaded. Luckily the fix is simple - and I nearly wanted to slap myself upside the head when a coworker pointed
+it out to me (bless him, though). We can add one more parameter to our signal function, and store one more item in our asset loader:
+
+{% highlight cpp %}
+using SignalFunctor = void(*)(void* object_instance, void* loaded_data);
+struct loadRequest {
+    loadRequest(ResourceData& dest) : destinationData(dest) {}
+    ResourceData& destinationData;
+    void* instancePtr;
+    SignalFunctor signal;
+};
+{% endhighlight %}
+
+Now we can call our signal function with a user-designated instance pointer, which allows us to easily call a member function but still operate and interface
+to this system through a C-style interface. When calling our signal function from the resource loader, upon completion of the loading step, we just pass in
+`instancePtr` to `signal`, and the user can do something like this:
+
+{% highlight cpp %}
+static void FinalizeCreationFn(void* instance, void* data) {
+    ObjModel* model_ptr = reinterpret_cast<ObjModel*>(instance);
+    model_ptr->FinalizeCreation(data);
+}
+
+void main(int argc, char* argv[]) {
+    // all of our previous steps remain the same
+    // however, we now just submit one extra parameter to our loading function: an instance pointer
+    resource_api->LoadFile("OBJ", HouseObjFile.c_str(), &ResourceTestScene.ObjModel, FinalizeCreationStaticFn);
+}
+{% endhighlight %}
+
+And just like that, one of the last major potential problems with our asset loader system has been solved!
+
 ### Afterthoughts and Conclusion
+
+This particular plugin was one that really began to test my resolve - it presented me with a couple unique challenges, both in terms of new topics I had never
+really dived into before (the deeper details of threading), and challenges related to my design choices. Having to interface with a shared library and keep things
+C-style was still fairly new to me, and handling things like member functions without the implicit `this` pointer proved to be a challenge that took some thought.
+
+There's still ample room for improvement - but it works well enough as is for now, and I'm glad that I took the time to design this particular system as multithreaded
+from the get-go. I cannot imagine that going back and retrofitting a single-threaded system to be multithreaded would've been much fun. Regardless, any comments or
+criticism would be appreciated - I have a lot to learn, and I can't do so without having my mistakes made abundantly clear!
+
+To close out, here's an example video of me testing this very plugin on Mac OSX - which served as verification that Vulkan (shimmed to Metal thanks to MoltenVk) was
+working on Mac, and that I wasn't going to have to deal with any weird bugs (thank heck) on Mac. Here, we asynchronously load three items: a skybox texture from a 
+`.dds` file, a `.png` texture for the house, and the `.obj` mesh data for the house:
+
+<iframe width="400" height="300" 
+src="https://giant.gfycat.com/CautiousKlutzyAcornweevil.webm">
+</iframe>
+
 
