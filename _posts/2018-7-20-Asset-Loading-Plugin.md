@@ -21,7 +21,7 @@ file just return this file instead of loading it from disk again
 with using the loaded data
 
 Additionally, in my case in particular, this will be functionality exposed through a resource-focused
-plugin in [VulpesSceneKit](https://github.com/fuchstraumer/VulpesSceneKit). So we can't use virtual
+plugin in [Caelestis](https://github.com/fuchstraumer/Caelestis). So we can't use virtual
 functions, pass user types (or library types) across the plugin/DLL boundary, or use templates. This
 causes some design difficulties from the very start.
 
@@ -31,7 +31,7 @@ Let's start from the very basics, forgetting for a moment that a DLL would alrea
 option:
 
 {% highlight cpp %}
-class AssetLoader {
+class ResourceLoader {
 public:
     LoadedData LoadFile(const char* fname);
 };
@@ -51,7 +51,7 @@ from the base class, and couldn't safely pass it in and out of the DLL. Heck. Bu
 can be used here: the factory pattern!
 
 {% highlight cpp %}
-class AssetLoader {
+class ResourceLoader {
 public:
     using FactoryFunctor = void*(*)(const char* fname);
     using SignalFunctor = void(*)(void* loaded_data);
@@ -120,13 +120,13 @@ struct ResourceData {
 
 But wait, how do we delete a `void*`? This is going to be undefined behavior, as there's no destructor for a `void*`. And
 it's _very_ likely we'll have significant quantities of data attached to a loaded asset that we do want to make sure
-are properly destroyed and released from memory.
+are properly destroyed/releasted.
 
 It took me a while to figure this one out, but the answer is surprisingly simple. We're going to add another function
 pointer to our factory registration method:
 
 {% highlight cpp %}
-class AssetLoader {
+class ResourceLoader {
 public:
     using FactoryFunctor = void*(*)(const char* fname);
     using SignalFunctor = void(*)(void* loaded_data);
@@ -155,16 +155,15 @@ void VulkanScene::setupAssets() {
 
 Since we've casted to the correct type before calling `delete`, we now know for certain that the type will have it's 
 destructor called properly and can trust that things will be unloaded successfully. And by doing it like this, we
-can still keep our plugin strictly decoupled from any clients, which is a big advantage! Onto our next requirement, though.
+can still keep our plugin strictly decoupled from any clients, which is a big advantage! 
 
 ### Thread the Loading Operations
 
-Disk I/O can be an expensive operation, and it's also likely that users will want to post-process the data after loading.
-Take the ObjModel example in [VulpesSceneKit](https://github.com/fuchstraumer/VulpesSceneKit/blob/master/tests/plugin_tests/ResourceContextSceneTest/ObjModel.cpp), for example.
+Our next requirement seems fairly apparent: Disk I/O can be an expensive operation, and it's also likely that users will want to post-process the data after loading. Take the ObjModel example in [Caelestis](https://github.com/fuchstraumer/Caelestis/blob/master/tests/plugin_tests/ResourceContextSceneTest/ObjModel.cpp), for example.
 
 In that case, we load a bunch of data from disk then try to reduce duplicated vertices in the loaded data, making sure 
 that we only end up storing and using unique vertices (note - this is nearly directly copied from how Overv does it in
-his excellent [Vulkan Tutorial series](https://vulkan-tutorial.com/)). This helps reduce RAM usage while loading/staging the asset,
+his excellent [Vulkan Tutorial series](https://vulkan-tutorial.com/)). This helps reduce RAM use while loading/staging the asset,
 and reduces VRAM usage (and potentially the expense of drawing the object, as well). It seems like we are heading towards a 
 producer-consumer setup - the producer will be the Load function called by clients, and the consumers (potentially
 multiple, as I don't think one thread will be enough here) will be the threads executing the load functions.
@@ -180,8 +179,7 @@ struct loadRequest {
 {% endhighlight %}
 
 I chose the constructor as I didn't want to copy the `ResourceData` structure into another thread, and because we should only
-be modifying one member of that object in the other thread, anyways. We'll then do the following when a user calls `Load()`. 
-I chose to copy the two function pointers, though: FactoryFunctor 
+be modifying one member of that object in the other thread, anyways. We'll then do the following when a user calls `Load()`:
 
 {% highlight cpp %}
 void ResourceLoader::Load(const char* file_type, const char* file_path, SignalFunctor signal)
@@ -204,11 +202,10 @@ void ResourceLoader::Load(const char* file_type, const char* file_path, SignalFu
 
 Here, we use a `std::lock_guard` and a `std::condition_variable` to implement our producer-consumer idiom: the consumer will wait on
 the condition variable until it is able to satisfy a condition, and checks the condition when notified by a call to `notify_one()`. So,
-we have the thread that is producing the requests acquire the mutex (to safely mutate the requests queue), add a request, then call
-notify a single waiting thread that there is potentially a request available (note that the mutex is implicitly released after we
-exit the scope it was declared in, thanks to the wondrous `std::lock_guard` <3).
+we have the thread that is producing the requests acquire and lock the mutex (to safely mutate the requests queue), add a request, then call
+`notify_one()` on the condition variable. This notifies a single waiting thread that there is potentially a request available for it to process.
 
-Our worker thread (or threads) is executing a function like so:
+Worker threads have been executing the following function:
 
 {% highlight cpp %}
 void ResourceLoader::workerFunction() {
@@ -228,45 +225,32 @@ void ResourceLoader::workerFunction() {
 }
 {% endhighlight %}
 
-`shutdown` is an atomic boolean used to get all threads to re-join when we are trying to shutdown/stop our system - otherwise we might
-potentially have threads in a detached state just running away into nowhere. Here, we are now using a `std::unique_lock` instead of
-a `std::lock_guard` - a `std::unique_lock` also will release the mutex once it exits scope, but unlike a guard we can explicitly unlock
-the attached mutex once we are done with it. Additionally, `std::condition_variable` just takes it as an argument for `wait()`.
+They should be spending most of their time sleeping on `cVar.wait()`: waiting for their call to wake up and process data, at which point they check against `shutdown` and to see if the queue isn't empty. Here, we are now using a `std::unique_lock` instead of a `std::lock_guard` - a `std::unique_lock` will also release the mutex once it exits scope, but unlike a guard we can explicitly `lock`, `try_lock`, and `unlock` the attached mutex. Lastly, `std::condition_variable` just takes it as an argument for `wait()`.
 
-To summarize what's going on here: we release the lock once we call `cVar.wait()` - but the current thread is blocked (so, our worker
-thread) and adds itself to a list of threads waiting on `cVar`. The thread is unblocked, as mentioned, when we call one of the condition
-variables notify functions - in this case, we use the supplied lambda function to check some conditions and make sure we _actually_ should
-have awoken.
+To summarize what's going on here: we release the lock once we call `cVar.wait()` (we had implicitly locked it upon construction of the `unique_lock`) - but the current thread is blocked (so, our worker thread) and adds itself to a list of threads waiting on `cVar`. The thread is woken, as mentioned, when we call one of the condition variables notify functions - in this case, we use the supplied lambda function to check some conditions and make sure we _actually_ should have awoken.
 
 If the condition returns true, the thread unblocks and continues execution. Here, we unblock if we're shutting down - so we can exit execution
-fully - or because there are requests for us to process. If there are requests to process we pop a request from the queue and grab a factory function
-pointer. Once we've done that, we unlock the lock so that other threads can potentially acquire it.
-
-From there, it's just a matter of executing the two function pointers we have. 
+fully and halt this thread for good - or because there are requests for us to process. If there are requests to process we pop a request from the queue and grab a factory function pointer. Once we've done that, we unlock the lock so that other threads can potentially acquire it (as we're no longer mutating potentially shared data). From there, it's just a matter of executing the two function pointers we have. 
 
 ##### Potential Issues and Fixes When Using Multiple Threads
 
-I quickly noted during my tests (running `ResourceContextSceneTest` in VulpesSceneKit) that attempting to join my two worker threads (when stopping the system)
-was failing on a deadlock. And behavior here became weird - calling `notify_all()` would cause a crash, as the notified thread would check
-requests and get an invalid value for `empty()` - as it's size had gone to the max for a `size_t`, and retrieving the first element
-caused a segfault. Which felt a little odd. 
+I quickly noted during my tests (running `ResourceContextSceneTest` in VulpesSceneKit) that attempting to join my two worker threads (when stopping the system) was failing on a deadlock. And behavior here became weird - calling `notify_all()` would cause a crash, as the notified thread would check requests and get an invalid value for `empty()` - as it's size had gone to the max for a `size_t`, and retrieving the first element caused a segfault. Which felt a little odd. 
 
-I believe the issue related to not using a `std::recursive_mutex`: this object is able to propagate state across multiple threads competing for it, so switching
-to that plus adding another check for the `shutdown` flag (if true, we return immediately before executing further) seemed to fix the problem for now.
+I believe the issue related to not using a `std::recursive_mutex`: this object is able to propagate state across multiple threads competing for it, so switching to that plus adding another check for the `shutdown` flag (if true, we return immediately before executing further) seemed to fix the problem for now.
+
+Lastly, what if a user calls `Load()` on something that is _already_ being loaded? The answer is fairly simple: we keep a list of assets that are currently
+in the process of loading, and make sure to not add them to our final container (`resources`, here) until they're truly complete. Otherwise, we would check
+`resources` and find a suitable `ResourceData` structure, with potentially a `Data` member filled out - however, the reality is that it's not quite loaded yet and isn't actually useable. For the sake of brevity, I won't show this code here - but it is available in `Caelestis`.
 
 ### Call a User-Supplied "Signal" Function
 
-Once out loading is complete, we're going to call the user supplied signal function - this lets the user process the data further in ways they see fit. In the case
-of loading (for example) a compressed texture from disk, this will be taking it from RAM and getting it into VRAM - along with performing the same for things like
-loaded `.obj` model data and the like. But there's a slight problem in our signal function signature that will quickly become apparent in-use:
+Once our loading is complete, we're going to call the user supplied signal function - this lets the user process the data as they see fit. There's a slight problem in our signal function signature that will quickly become apparent in-use, however:
 
 {% highlight cpp %}
 using SignalFunctor = void(*)(void* loaded_data);
 {% endhighlight %}
 
-The function signature assumes that we are either working with a static function, or a member function of the appropriate signature. The latter will probably be 
-common: I myself had some `ObjModel` class with a `FinalizeCreation(void* data)` function that I wanted to call - and quickly realized that wait a sec this won't
-work. We can't use member functions with our C-style interface, and the other option would be some less-than-ideal thing like:
+The function signature assumes that we are either working with a static function, or a member function of the appropriate signature. The latter will probably be common: I myself had some `ObjModel` class with a `FinalizeCreation(void* data)` function that I wanted to call - and quickly realized that this won't work. We can't use member functions with our C-style interface, and the other option would be some less-than-ideal thing like:
 
 {% highlight cpp %}
 static ObjModel* currModelPtr = nullptr;
@@ -287,9 +271,7 @@ void main(int argc, char* argv[]) {
 }
 {% endhighlight %}
 
-Gross. For one, this just feels gross and bad. But it definitely can become bad: if we're loading multiple models, we now have to make sure to update that 
-static function pointer before each model is loaded. Luckily the fix is simple - and I nearly wanted to slap myself upside the head when a coworker pointed
-it out to me (bless him, though). We can add one more parameter to our signal function, and store one more item in our asset loader:
+Gross. For one, this just feels vaguely "wrong", like a code smell. It can definitively become bad, though: if we're loading multiple models, we now have to make sure to update that static instance pointer before each model is loaded. Luckily the fix is simple - and I nearly wanted to slap myself upside the head when a coworker pointed it out to me (bless him, though). We can add one more parameter to our signal function, and store one more item in our asset loader:
 
 {% highlight cpp %}
 using SignalFunctor = void(*)(void* object_instance, void* loaded_data);
@@ -322,17 +304,11 @@ And just like that, one of the last major potential problems with our asset load
 
 ### Afterthoughts and Conclusion
 
-This particular plugin was one that really began to test my resolve - it presented me with a couple unique challenges, both in terms of new topics I had never
-really dived into before (the deeper details of threading), and challenges related to my design choices. Having to interface with a shared library and keep things
-C-style was still fairly new to me, and handling things like member functions without the implicit `this` pointer proved to be a challenge that took some thought.
+This particular plugin was one that really began to test my resolve - it presented me with a couple unique challenges, both in terms of new topics I had never really dived into before (the deeper details of threading), and challenges related to my design choices. Having to interface with a shared library and keep things C-style was still fairly new to me, and handling things like member functions without the implicit instance pointer proved to be a challenge that took some thought.
 
-There's still ample room for improvement - but it works well enough as is for now, and I'm glad that I took the time to design this particular system as multithreaded
-from the get-go. I cannot imagine that going back and retrofitting a single-threaded system to be multithreaded would've been much fun. Regardless, any comments or
-criticism would be appreciated - I have a lot to learn, and I can't do so without having my mistakes made abundantly clear!
+There's still ample room for improvement - but it works well enough as is for now, and I'm glad that I took the time to design this particular system as multithreaded from the get-go. I cannot imagine that going back and retrofitting a single-threaded system to be multithreaded would've been much fun. Regardless, any comments or criticism would be appreciated - I have a lot to learn, and I can't do so without having my mistakes made abundantly clear!
 
-To close out, here's an example video of me testing this very plugin on Mac OSX - which served as verification that Vulkan (shimmed to Metal thanks to MoltenVk) was
-working on Mac, and that I wasn't going to have to deal with any weird bugs (thank heck) on Mac. Here, we asynchronously load three items: a skybox texture from a 
-`.dds` file, a `.png` texture for the house, and the `.obj` mesh data for the house:
+To close out, here's an example video of me testing this very plugin on Mac OSX - which served as verification that Vulkan (shimmed to Metal thanks to MoltenVk) was working on Mac, and that I wasn't going to have to deal with any weird bugs (thank heck) on Mac. Here, we asynchronously load three items: a skybox texture from a  `.dds` file, a `.png` texture for the house, and the `.obj` mesh data for the house:
 
 <iframe width="400" height="300" 
 src="https://giant.gfycat.com/CautiousKlutzyAcornweevil.webm">
