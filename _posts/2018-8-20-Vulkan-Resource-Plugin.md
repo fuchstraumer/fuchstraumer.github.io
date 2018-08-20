@@ -3,7 +3,7 @@ layout: post
 date: 2018-7-20
 title: "Making an Asset Loader Plugin in C++"
 img: cascades.jpg
-published: false
+published: true
 tags: [C++, Engine Development, Vulkan, Plugins]
 ---
 
@@ -67,3 +67,14 @@ There's nothing too surprising here: the nice thing about the handles to Vulkan 
 `Name` and `UserData` have been left for later use: named resources can be quite useful when working with shader reflection and rendergraph systems (*cough*, ShaderTools), and `UserData` has become something I've grown to appreciate - allowing for later expansion or the attachment of further metadata as required even if it falls outside the scope of our original plans.
 
 #### Step 2: Creating VulkanResource objects
+
+In order to avoid having the user copy a bunch of data (mostly pointers and 64-bit handles, to be fair) they don't probably need a copy of, we're going to have all of our creation functions just return `VulkanResource*`. Users can then store and use these pointers as they see fit. When creating a resource, we'll give users optional parameters by having most parameters be provided as pointers, so that they can selectively pass `nullptr` for the pieces they don't expect to use. Our two main creation functions will then be:
+
+{% highlight cpp %}
+VulkanResource* CreateBuffer(const VkBufferCreateInfo* info, const VkBufferViewCreateInfo* view_info, 
+    const size_t num_data, const gpu_resource_data_t* initial_data, const uint32_t mem_type, void* user_data);
+VulkanResource* CreateImage(const VkImageCreateInfo* info, const VkImageViewCreateInfo* view_info, 
+    const size_t num_data, const gpu_image_resource_data_t* initial_data, const uint32_t _memory_type, void* user_data);
+{% endhighlight %}
+
+
