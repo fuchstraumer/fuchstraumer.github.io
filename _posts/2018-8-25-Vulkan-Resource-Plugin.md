@@ -1,7 +1,7 @@
 ---
 layout: post
-date: 2018-7-20
-title: "Making an Asset Loader Plugin in C++"
+date: 2018-8-25
+title: "Making a Vulkan Resource Plugin"
 img: cascades.jpg
 published: true
 tags: [C++, Engine Development, Vulkan, Plugins]
@@ -42,7 +42,7 @@ This gives us a fairly clear picture of what capabilities we need to support, so
 
 ## Implementing Our Resource System
 
-#### Step 1: Considering the Nature of our Plugin System
+### Step 1: Considering the Nature of our Plugin System
 
 As mentioned briefly in the opening paragraph, this resource system will be part of the plugin-based paradigm I am pursuing in my engine code. So that is going to make things immediately difficult: as in, passing complex classes like the old `vpr::Buffer` and `vpr::Image` across plugin boundaries is going to become impossible. But this is also probably for the best - these complex classes resulted in a lot of behind-the-scenes implicit behavior and a number of assumptions based on the user's intent.
 
@@ -66,7 +66,7 @@ There's nothing too surprising here: the nice thing about the handles to Vulkan 
 
 `Name` and `UserData` have been left for later use: named resources can be quite useful when working with shader reflection and rendergraph systems (*cough*, ShaderTools), and `UserData` has become something I've grown to appreciate - allowing for later expansion or the attachment of further metadata as required even if it falls outside the scope of our original plans.
 
-#### Step 2: Creating VulkanResource objects
+### Step 2: Creating VulkanResource objects
 
 In order to avoid having the user copy a bunch of data (mostly pointers and 64-bit handles, to be fair) they don't probably need a copy of, we're going to have all of our creation functions just return `VulkanResource*`. Users can then store and use these pointers as they see fit. When creating a resource, we'll give users optional parameters by having most parameters be provided as pointers, so that they can selectively pass `nullptr` for the pieces they don't expect to use. Our two main creation functions will then be:
 
@@ -77,4 +77,18 @@ VulkanResource* CreateImage(const VkImageCreateInfo* info, const VkImageViewCrea
     const size_t num_data, const gpu_image_resource_data_t* initial_data, const uint32_t _memory_type, void* user_data);
 {% endhighlight %}
 
+The parameters that I haven't directly addressed yet are those used to se the initial contents of the buffers - `gpu_resource_data_t` is a structure that holds a pointer to some data along with the size of said data, along with some memory alignment and pitch information members as required. I unfortunately found out that a seperate, and more detailed, structure `gpu_image_resource_data_t` is effectively required in order for us to be able to set the initial data of images, however. We'll return to that shortly, however. The rest of the parameters should be fairly apparent - if we pass a `nullptr` for a `view_info` parameter, that resource's `ViewHandle` field won't be set as the view object won't be created (this will be pretty common with buffers, for example, unless we're using them as texel buffers).
 
+#### Setting Initial Resource Data
+
+This is where things got to be a little bit tricky: previously, a lot of this logic had been made more implicit or had been embedded fairly deeply into the individual resource types themselves. At first, I thought I could get away with using this simple structure for setting the contents of buffers *and* images:
+
+{% highlight cpp %}
+struct gpu_resource_data_t {
+    const void* Data;
+    size_t DataSize;
+    size_t DataAlignment;
+    uint32_t Pitch;
+    uint32_t SlicePitch;
+};
+{% endhighlight %}
