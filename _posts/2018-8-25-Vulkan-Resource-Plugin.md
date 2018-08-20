@@ -3,7 +3,7 @@ layout: post
 date: 2018-8-25
 title: "Making a Vulkan Resource Plugin"
 img: cascades.jpg
-published: true
+published: false
 tags: [C++, Engine Development, Vulkan, Plugins]
 ---
 
@@ -71,10 +71,10 @@ There's nothing too surprising here: the nice thing about the handles to Vulkan 
 In order to avoid having the user copy a bunch of data (mostly pointers and 64-bit handles, to be fair) they don't probably need a copy of, we're going to have all of our creation functions just return `VulkanResource*`. Users can then store and use these pointers as they see fit. When creating a resource, we'll give users optional parameters by having most parameters be provided as pointers, so that they can selectively pass `nullptr` for the pieces they don't expect to use. Our two main creation functions will then be:
 
 {% highlight cpp %}
-VulkanResource* CreateBuffer(const VkBufferCreateInfo* info, const VkBufferViewCreateInfo* view_info, 
-    const size_t num_data, const gpu_resource_data_t* initial_data, const uint32_t mem_type, void* user_data);
-VulkanResource* CreateImage(const VkImageCreateInfo* info, const VkImageViewCreateInfo* view_info, 
-    const size_t num_data, const gpu_image_resource_data_t* initial_data, const uint32_t _memory_type, void* user_data);
+VulkanResource* CreateBuffer(const VkBufferCreateInfo*, const VkBufferViewCreateInfo*, const size_t num_data, 
+    const gpu_resource_data_t* initial_data, const uint32_t mem_type, void* user_data);
+VulkanResource* CreateImage(const VkImageCreateInfo*, const VkImageViewCreateInfo*, const size_t num_data, 
+    const gpu_image_resource_data_t* initial_data, const uint32_t _memory_type, void* user_data);
 {% endhighlight %}
 
 The parameters that I haven't directly addressed yet are those used to se the initial contents of the buffers - `gpu_resource_data_t` is a structure that holds a pointer to some data along with the size of said data, along with some memory alignment and pitch information members as required. I unfortunately found out that a seperate, and more detailed, structure `gpu_image_resource_data_t` is effectively required in order for us to be able to set the initial data of images, however. We'll return to that shortly, however. The rest of the parameters should be fairly apparent - if we pass a `nullptr` for a `view_info` parameter, that resource's `ViewHandle` field won't be set as the view object won't be created (this will be pretty common with buffers, for example, unless we're using them as texel buffers).
