@@ -263,7 +263,8 @@ void main(int argc, char* argv[]) {
     manager.LoadPlugin("resource_context.dll");
     resource_api = reinterpret_cast<ResourceContext_API*>(manager.RetrieveAPI(RESOURCE_CONTEXT_API_ID));
     // register our creation/destruction functions:
-    resource_api->RegisterFileTypeFactory("OBJ", &ResourceTestScene::LoadObjFile, &ResourceTestScene::DestroyObjFileData);
+    resource_api->RegisterFileTypeFactory("OBJ", &ResourceTestScene::LoadObjFile, 
+        &ResourceTestScene::DestroyObjFileData);
     // doing our usual setup, etc, get to asset loading - but first need to set "currModelPtr"
     currModelPtr = &ResourceTestScene.ObjModel;
     // okay now we can load it
@@ -296,7 +297,8 @@ static void FinalizeCreationFn(void* instance, void* data) {
 void main(int argc, char* argv[]) {
     // all of our previous steps remain the same
     // however, we now just submit one extra parameter to our loading function: an instance pointer
-    resource_api->LoadFile("OBJ", HouseObjFile.c_str(), &ResourceTestScene.ObjModel, FinalizeCreationStaticFn);
+    resource_api->LoadFile("OBJ", HouseObjFile.c_str(), &ResourceTestScene.ObjModel, 
+        FinalizeCreationStaticFn);
 }
 {% endhighlight %}
 
