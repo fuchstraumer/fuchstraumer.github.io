@@ -81,3 +81,17 @@ ourDescriptorSetLayout.AddSetLayoutBindings(setBindings[0]);
 {% endhighlight %}
 
 Further, by tracking this data at a slightly higher level and between multiple invocations of this "reflection" system, one could get an accurate count of the resources required - so setting up your `VkDescriptorPool` to perfectly match the requirements of the current suite of shaders became nearly trivial! It had the effect of reducing code complexity *and* making things much more flexible - effectively, we had incidentally moved to a data-driven design where the "data" was our shaders. This data was now affecting the behavior of our code, and our code adapted to the data instead of the other way around (or just a lack of adaptation whatsoever).
+
+### Potential Issues
+
+However, there is one problem I have not yet solved. One still has to make sure that compatability between shader resources is maintained between all resources that may use a given set of resources: for example, let's say I perform the binding shuffling I briefly mentioned earlier (where I suggested adding a uniform buffer). I can't just modify a single shader doing that - I have to then modify all shaders that bind to that particular descriptor set. Sure, I could create an all-new unique descriptor set just for that single shader: but, descriptor set binding is one of the more expensive operations we can perform in Vulkan so it's more ideal for use to keep our descriptors pooled, to reduce binding changes. But copying and pasting code around, and remembering to always do so, is less than ideal as well. So, how do we fix this?
+
+## Shader Generation
+
+In order to get around this problem, we can move to a generative shader approach: this makes plenty of sense, and is one that most shader toolchain software packages end up using anyways. As I am singular person, however, I'll avoid the highly abstracted approach of Unity and Unreal Engine: as great as that can be, the scope of work required is simply far too immense for me to manage among all my other work.
+
+So, my goal became generating just the resource declarations per-shader: users will still have to write the `main()` block as they would otherwise, but dealing with the intricacies and irritations of Vulkans resource binding model would be effectively removed. Additionally, we could take this chance to add simple things like simpler handling of specialization constants, `#include` support, and other various pre-processor features (as we are now writing a GLSL preprocessor). So, let's get to work.
+
+#### #include Support
+
+For this next bit, I'm going to proceed in an order of decreasing complexity to increasing complexity - so let's start with the simplest feature we can support, `#include`s.
