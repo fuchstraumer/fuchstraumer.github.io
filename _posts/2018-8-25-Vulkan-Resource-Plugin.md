@@ -35,7 +35,7 @@ Okay, so we clearly have some room for improvement when it comes to creating, de
 - Creating resources with initial contents should be as easy as creating them *without* any initial contents
 - Destroying resources should be able to be performed simply and explicitly
 - Creating and destroying resources from multiple threads must be possible
-- Transferring data from staging buffers should be performed asynchrously and without user involvement
+- Transferring data from staging buffers should be performed asynchronously and without user involvement
 - Cleaning up and managing the lifetime of these staging buffers and their data must be done by the system, not the user
 
 This gives us a fairly clear picture of what capabilities we need to support, so I began to move forward with the design.
@@ -92,3 +92,35 @@ struct gpu_resource_data_t {
     uint32_t SlicePitch;
 };
 {% endhighlight %}
+
+But there are issues when this is applied to images: we can't, for example, figure out how many MIP levels we have. Even if we passed in an array of these initial data structures, we couldn't back out this sort of info. Backing out things like the width and height is doable, but we'd still be missing other fields like "Array Layers" and so on: so it's easiest to just add this unique structure for handling image data uploads:
+
+{% highlight cpp %}
+struct gpu_image_resource_data_t {
+    const void* Data = nullptr;
+    size_t DataSize{ 0 };
+    uint32_t Width{ 0 };
+    uint32_t Height{ 0 };
+    uint32_t ArrayLayer{ 0 };
+    uint32_t NumLayers{ 1 };
+    uint32_t MipLevel{ 0 };
+};
+{% endhighlight %}
+
+Via usage of this structure, we are now able to rather easily set the contents of everything from simple 1D linearly-tiled images made up of barely thousands of pixels, to uploading complex images with multiple mip levels like cubemaps or array textures. While it isn't *great* that we have two barely-differing structures that serve effectively the same purpose, the advantages of this approach are rather apparent and absolutely worth any minor code issues they may cause down the road.
+
+#### Transferring Resource Data to the GPU
+
+Another area that can become potentially tricky is the transferring of data to the GPU: in Vulkan, we have to manage these operations at a level of complexity that is effectively unheard of in earlier DirectX versions and in OpenGL. First, there are two types of memory in Vulkan:
+
+- Host visible
+- Device local
+
+Our logic for handling transfers is split based on these memory types: host-visible memory is much easier to transfer into, as it's usually a designated region of RAM that the CPU and GPU share access to, and writing into it requires much less work. Effectively, it becomes: (assuming we're not using the `HOST_COHERENT` flag here, for performance reasons)
+
+- If we're not worried about readbacks, skip mapped memory region invalidation and just map the region we wish to copy into
+- Perform a simply `memcpy` to copy into the desired memory region, potentially using a simple `for` loop + an offset if we have an array of `gpu_resource_data_t` structures
+- Make sure to unmap the region once our transfer is complete
+- Lastly, call a Vulkan "flush" command to ensure our writes from the CPU are visible to the GPU as well
+
+This copy process is not complex at all - but the process of copying into device-local memory is considerably more involved. First, we will need to take our initial data ("stored" in either `gpu_resource_data_t` or `gpu_image_resource_data_t` structures) and copy them into `VkBuffer`s that we will be using as "staging" buffers.
