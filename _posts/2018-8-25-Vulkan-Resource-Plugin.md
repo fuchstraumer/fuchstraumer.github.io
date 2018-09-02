@@ -266,9 +266,13 @@ Barely a dozen lines of code allows us to use our spinlock in a nice and safe ma
 
 Ultimately, I will admit that the choice to use a spinlock was a personal one - I had yet to use one at all, and it seemed well-suited to my purpose. Using a mutex would've gotten the job done as well, but since I expect our locking times (and thus waiting times for other threads) to remain short, I believe that it won't end up being a *bad* choice, per-se, in the long run. 
 
-Thread-safety 
+Thread-safety for container insertion (for containers used for storing our `VulkanResource` objects, and more) is done in the more standard manner using `std::mutex` and `std::lock_guard`. Where possible, however, the code was structure so that container modifications - i.e, adding or removing entries - was done in batches. Then, pointers are quickly retrieved to the added elements so that we can release the mutex and proceed onwards with our work. This so far has allowed for the fluent creation and destruction of resources from multiple threads - and, the `vpr::Allocator` and memory allocation system therein is already thread-safe as well. 
 
-### Managing the Lifetime of Data and Resources
+### Transfer System, Continued
+
+So far I've mentioned the transfer system briefly and not in terrible detail - but there are a few more details worth going into. Initial testruns showed that I was spending quite a bit of CPU time calling `vkQueueSubmit` through the transfer system - even though there weren't any actual transfers occuring, as the singular `VkCommandBuffer` we were using didn't have any transfers recorded into it.
+
+This occured as our plugin has a function called `LogicalUpdate` that is called every frame, at the beginning of the frame, without any delta-time information: it's intended for internal plugin state updating and the like, so in the case of this plugin I had placed a `TransferSystem::CompleteTransfers` call and a call to flush our staging buffers within it (so, we transfer all our data then clear all the `UploadBuffer` structures we created for these transfers).
 
 ### Conclusion
 
