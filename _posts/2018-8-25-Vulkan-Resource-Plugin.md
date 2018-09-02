@@ -125,7 +125,29 @@ Our logic for handling transfers is split based on these memory types: host-visi
 
 This copy process is not complex at all - but the process of copying into device-local memory is considerably more involved. 
 
-#### Copying Into Device-Local Memory for Buffers
+#### Transfer System Infrastructure
+
+First, we have to create "staging" buffers for our data: these are literal `VkBuffer` objects that we will create purely for transferring data out of (into the device-local buffers we plan to actually use). In order to wrap this functionality up in a clean way, so that I could track these staging buffers more easily, I created the following `UploadBuffer` structure:
+
+{% highlight cpp %}
+struct UploadBuffer {
+    UploadBuffer(const vpr::Device* _device, vpr::Allocator* alloc, VkDeviceSize sz);
+    void SetData(const void* data, size_t data_size, size_t offset);
+    VkBuffer Buffer;
+    vpr::Allocation alloc;
+    const vpr::Device* device;
+};
+{% endhighlight %}
+
+We use our constructor to quickly create `vpr::Allocation` and `VkBuffer` objects for use as staging buffers - and since we will so clearly know what the various flags and parameters we need to construct these will be, the only parameter that really varies is the size of the allocation itself. From there, we call `SetData` with a data pointer, a size, and an offset into the staging buffer as many times as we need to fully populate it's contents.
+
+There's no destructor explicitly defined, but the copy constructor and copy assignment operator have been explicitly deleted - creating a copy of these objects could prove disastrous, and having these implicitly destroyed is not quite what we want (as unfortunate as it is, because it does make things a bit messy). We store all of our upload buffers in a single container, and these are cleared per-frame after the various transfers they are used for have been completed.
+
+The transferring of data from the `UploadBuffer` structures into the actual destination resources is done by the `TransferSystem` - itself a thin wrapper over a `vpr::CommandPool` and some thread-safety related items (addressed later). Once we have our upload buffer populated, we use the `TransferSystem` to retrieve a `VkCommandBuffer` that we can record transfer commands into like so:
+
+{% highlight cpp %}
+
+{% endhighlight %}
 
 #### Copying Into Device-Local Memory for Images
 
