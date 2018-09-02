@@ -47,7 +47,7 @@ This is extremely gross. We don't want to write this, and we're (assumedly) peop
 
 {% highlight cpp %}
 // texelBuffersLayout is a vpr::DescriptorSetLayout, used to describe the layout of a single 
-// descriptor set's resources
+// descriptor set's resources. This layout is for the "ClusteredForward" resource block.
 constexpr static VkShaderStageFlags fc_flags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
 texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, fc_flags, 0);
 texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, fc_flags, 1);
@@ -59,6 +59,12 @@ texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER
 texelBuffersLayout->Create();
 {% endhighlight %}
 
-And the gift
+And the gift keeps giving: Vulkan descriptor sets are allocated from `VkDescriptorPool`s. Creating these pools effectively requires forecasting, ahead of time, how many of each of the Vulkan `VK_DESCRIPTOR_TYPE_` resources you plan to use: if you try to allocate for 12 texel buffers, but you only specified room for 6, the API will throw errors and things will break really quick. And what if you change some of the bindings around? The above code has bindings 0-6 for texel buffers - but if we modify the shader to add a uniform buffer at binding 0, we have to make sure our code reflects that (both by changing the above bindings, and making sure our `VkDescriptorPool` has room). It's a lot of work to manage, and it's just not easy to keep sane with all this going on. 
 
+So these issues motivated the initial work into ShaderTools: let's take our pre-existing shaders, and just reflect back upon them to generate all this binding metadata at runtime (as no such mechanism exists in Vulkan, like it did in OpenGL). 
 
+# Shader Reflection - the Beginnings
+
+If one wants to perform reflection on SPIR-V shaders, you're going to have to use the [spirv-cross]() library. By feeding it a SPIR-V binary blob, one can query the library and get access to *all* of the resources used by a shader. From here, it's only a matter of collating this data across multiple stages (usually just vertex + fragment) and generating the relevant data: in initial versions of my library, the literally meant just generating the arrays of `VkDescriptorSetLayoutBinding`s one would require for a given combination of shaders. 
+
+Further, by tracking this data at a slightly higher level and between multiple invocations of this "reflection" system, one could get an accurate count of the resources required - so setting up your `VkDescriptorPool` to perfectly match the requirements of the current suite of shaders became nearly trivial! It had the effect of reducing code complexity *and* making things much more flexible - effectively, we had incidentally moved to a data-driven design where the "data" was our shaders. This data was now affecting the behavior of our code, and our code adapted to the data instead of the other way around (or just a lack of adaptation whatsoever).
