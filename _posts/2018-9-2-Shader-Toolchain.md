@@ -67,4 +67,17 @@ So these issues motivated the initial work into ShaderTools: let's take our pre-
 
 If one wants to perform reflection on SPIR-V shaders, you're going to have to use the [spirv-cross]() library. By feeding it a SPIR-V binary blob, one can query the library and get access to *all* of the resources used by a shader. From here, it's only a matter of collating this data across multiple stages (usually just vertex + fragment) and generating the relevant data: in initial versions of my library, the literally meant just generating the arrays of `VkDescriptorSetLayoutBinding`s one would require for a given combination of shaders. 
 
+{% highlight cpp %}
+const size_t num_descriptor_sets = reflectionSystem->GetNumDescriptorSets();
+std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings(num_descriptor_sets);
+for (size_t i = 0; i < num_descriptor_sets; ++i) {
+    size_t num_bindings = 0;
+    reflectionSystem->GetLayoutBindings(i, &num_bindings, nullptr);
+    setBindings[i].resize(num_bindings);
+    reflectionSystem->GetLayoutBindings(i, &num_bindings, setBindings[i].data());
+}
+// assuming we have some VkDescriptorSetLayout wrapper class, we then just add the bindings:
+ourDescriptorSetLayout.AddSetLayoutBindings(setBindings[0]);
+{% endhighlight %}
+
 Further, by tracking this data at a slightly higher level and between multiple invocations of this "reflection" system, one could get an accurate count of the resources required - so setting up your `VkDescriptorPool` to perfectly match the requirements of the current suite of shaders became nearly trivial! It had the effect of reducing code complexity *and* making things much more flexible - effectively, we had incidentally moved to a data-driven design where the "data" was our shaders. This data was now affecting the behavior of our code, and our code adapted to the data instead of the other way around (or just a lack of adaptation whatsoever).
