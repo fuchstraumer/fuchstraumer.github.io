@@ -141,7 +141,7 @@ struct UploadBuffer {
 
 We use our constructor to quickly create `vpr::Allocation` and `VkBuffer` objects for use as staging buffers - and since we will so clearly know what the various flags and parameters we need to construct these will be, the only parameter that really varies is the size of the allocation itself. From there, we call `SetData` with a data pointer, a size, and an offset into the staging buffer as many times as we need to fully populate it's contents.
 
-There's no destructor explicitly defined, but the copy constructor and copy assignment operator have been explicitly deleted - creating a copy of these objects could prove disastrous, and having these implicitly destroyed is not quite what we want (as unfortunate as it is, because it does make things a bit messy). We store all of our upload buffers in a single container, and these are cleared per-frame after the various transfers they are used for have been completed.
+There's no destructor explicitly defined, but the copy constructor and copy assignment operator have been explicitly deleted - creating a copy of these objects could prove disastrous, and having these implicitly destroyed is not quite what we want (as unfortunate as it is, because it does make things a bit messy). We store all of our upload buffers in a single container, and these are cleared per-frame after the various transfers they are used for have been completed. By doing these all at once we are also able to make sure that the memory attached is properly freed, and that the created `VkBuffer` gets destroyed too.
 
 The transferring of data from the `UploadBuffer` structures into the actual destination resources is done by the `TransferSystem` - itself a thin wrapper over a `vpr::CommandPool` and some thread-safety related items (addressed later). Once we have our upload buffer populated, we use the `TransferSystem` to retrieve a `VkCommandBuffer` that we can record transfer commands into like so:
 
@@ -270,12 +270,17 @@ Thread-safety for container insertion (for containers used for storing our `Vulk
 
 ### Transfer System, Continued
 
-So far I've mentioned the transfer system briefly and not in terrible detail - but there are a few more details worth going into. Initial testruns showed that I was spending quite a bit of CPU time calling `vkQueueSubmit` through the transfer system - even though there weren't any actual transfers occuring, as the singular `VkCommandBuffer` we were using didn't have any transfers recorded into it.
+So far I've mentioned the transfer system briefly and not in terrible detail - but there are a few more details worth going into. Initial testruns showed that I was spending quite a bit of CPU time calling `vkQueueSubmit` through the transfer system - even though there weren't any actual transfers occuring, as the singular `VkCommandBuffer` we were using didn't have any transfers recorded into it. This occured as our plugin has a function called `LogicalUpdate` that is called every frame, at the beginning of the frame, without any delta-time information: it's intended for internal plugin state updating and the like, so in the case of this plugin I had placed a `TransferSystem::CompleteTransfers` call and a call to flush our staging buffers within it (so, we transfer all our data then clear all the `UploadBuffer` structures we created for these transfers).
 
-This occured as our plugin has a function called `LogicalUpdate` that is called every frame, at the beginning of the frame, without any delta-time information: it's intended for internal plugin state updating and the like, so in the case of this plugin I had placed a `TransferSystem::CompleteTransfers` call and a call to flush our staging buffers within it (so, we transfer all our data then clear all the `UploadBuffer` structures we created for these transfers).
+The fix ended up being really quite simple: set a flag to mark the attached command buffer as dirty, which is only set if `TransferSystem::TransferCmdBuffer()` is called. Then, when `TransferSystem::CompleteTransfers` we can check to see if this flag has been set - if so, we have work to submit and we proceed with a call to `vkQueueSubmit`. After that, we reset our flag to mark the command buffer as unused. 
 
 ### Conclusion
 
 ### Potential Further Work
 
-The following are just various ideas I've had for extending the API
+The following are just various ideas I've had for improving this library, but haven't gotten to yet - in practice, the current version works more than well enough for me. Additionally, I've been pressed for time lately and just haven't had the ability to tune this plugin to it's peak as much as I tune everything else I write:
+
+- See if things like [Slim Reader/Writer locks](https://docs.microsoft.com/en-us/windows/desktop/Sync/slim-reader-writer--srw--locks), or critical sections and the corresponding Unix utilities, could be used to improve performance of the thread-safety related code
+- Interface this plugin with ShaderTools, so that this plugin can automatically create the backing resources required for a shader or shader group in one go
+- Make sure that submitting transfer work to a unique/dedicated transfer queue actually works, and doesn't cause ownership issues with the Vulkan API when said resources are used by the graphics queue
+  
