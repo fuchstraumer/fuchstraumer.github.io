@@ -63,7 +63,7 @@ And the gift keeps giving: Vulkan descriptor sets are allocated from `VkDescript
 
 So these issues motivated the initial work into ShaderTools: let's take our pre-existing shaders, and just reflect back upon them to generate all this binding metadata at runtime (as no such mechanism exists in Vulkan, like it did in OpenGL). 
 
-# Shader Reflection - the Beginnings
+## Shader Reflection - the Beginnings
 
 If one wants to perform reflection on SPIR-V shaders, you're going to have to use the [spirv-cross]() library. By feeding it a SPIR-V binary blob, one can query the library and get access to *all* of the resources used by a shader. From here, it's only a matter of collating this data across multiple stages (usually just vertex + fragment) and generating the relevant data: in initial versions of my library, the literally meant just generating the arrays of `VkDescriptorSetLayoutBinding`s one would require for a given combination of shaders. 
 
