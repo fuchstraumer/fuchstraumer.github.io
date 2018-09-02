@@ -31,12 +31,12 @@ In addition, I was almost always implicitly creating `VkImageView` objects - sin
 
 Okay, so we clearly have some room for improvement when it comes to creating, destroying, modifying, and generally managing our Vulkan resources. Before I began, I laid out a few clear requirements I had in mind:
 
-    - Creating resources should avoid as many implicit hidden steps as possible
-    - Creating resources with initial contents should be as easy as creating them *without* any initial contents
-    - Destroying resources should be able to be performed simply and explicitly
-    - Creating and destroying resources from multiple threads must be possible
-    - Transferring data from staging buffers should be performed asynchrously and without user involvement
-    - Cleaning up and managing the lifetime of these staging buffers and their data must be done by the system, not the user
+- Creating resources should avoid as many implicit hidden steps as possible
+- Creating resources with initial contents should be as easy as creating them *without* any initial contents
+- Destroying resources should be able to be performed simply and explicitly
+- Creating and destroying resources from multiple threads must be possible
+- Transferring data from staging buffers should be performed asynchrously and without user involvement
+- Cleaning up and managing the lifetime of these staging buffers and their data must be done by the system, not the user
 
 This gives us a fairly clear picture of what capabilities we need to support, so I began to move forward with the design.
 
