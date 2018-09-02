@@ -219,10 +219,59 @@ const VkImageMemoryBarrier barrier1{
 
 ### Step 4: Destroying Vulkan Resources
 
-With our resources created and their initial data set, we can then freely proceed to use them - and once done, destroy them.
+With our resources created and their initial data set, we can then freely proceed to use them - and once done, destroy them. Thankfully, this is probably one of the simplest things we're going to implement in this entire system - the signature of the function is literally just:
+
+{% highlight cpp %}
+void DestroyResource(VulkanResource* rsrc);
+{% endhighlight %}
+
+Internally, we use a switch case to read the `type` field of our resource structure, and then call a unique function for destroying our various types. In the case of buffers and images, we also perform additional checks to see if we created and `view` members and make sure these get destroyed, and lastly finish be making sure to call `allocator->FreeMemory()` to free and release the memory used by the resource as well. The only potential issue is making sure we aren't erasing out of containers while other threads are adding new entries, so we quickly nab the mutex and lock it via a `std::lock_guard`.
 
 ### Thread-Safety
+
+Speaking of issues with threading, though, lets tackle the various ways we can protect ourselves from these problems and the various systems that had their design affected. First, the `TransferSystem` mentioned earlier comes to mind: within it, I implemented a basic spinlock based on work I saw in [WickedEngine](https://github.com/turanszkij/WickedEngine/blob/bb10f92b7cb6269c8a46edd2dcd9abe00d25d267/WickedEngine/wiSpinLock.h). My version is effectively the same, but with a minor twist: instead of explicitly using the `lock()` and `unlock()` functions, a dangerous proposition for my absent-minded self, I created a `transferSpinLockGuard` structure. This structure serves the same purpose as a `std::lock_guard` - attempting to acquire the spinlock on construction, and releasing it upon destruction. The structure itself is *remarkably* simple and I feel much more confident and safe using it than the raw object itself:
+
+{% highlight cpp %}
+struct transferSpinLockGuard {
+    transferSpinLock& lck;
+    transferSpinLockGuard(transferSpinLock& _lock);
+    ~transferSpinLockGuard();
+};
+
+transferSpinLockGuard::transferSpinLockGuard(transferSpinLock& _lock) : 
+    lck(_lock) {
+    lck.lock();
+}
+
+transferSpinLockGuard::~transferSpinLockGuard() {
+    lck.unlock();
+}
+{% endhighlight %}
+
+Barely a dozen lines of code allows us to use our spinlock in a nice and safe manner: we then acquire the spinlock from the transfer system itself right before we begin recording transfer commands:
+
+{% highlight cpp %}
+// Leverage RAII to our advantage more: use 
+// brackets to create a new scope. Record 
+// transfer commands in brackets, spinlock
+// released ASAP when we exit brackets again!
+{
+    auto& transfer_system = 
+        ResourceTransferSystem::GetTransferSystem();
+    auto guard = transfer_system.AcquireSpinLock();
+    auto cmd = transfer_system.TransferCmdBuffer(); 
+    // record transfer commands as per the usual
+}
+{% endhighlight %}
+
+Ultimately, I will admit that the choice to use a spinlock was a personal one - I had yet to use one at all, and it seemed well-suited to my purpose. Using a mutex would've gotten the job done as well, but since I expect our locking times (and thus waiting times for other threads) to remain short, I believe that it won't end up being a *bad* choice, per-se, in the long run. 
+
+Thread-safety 
 
 ### Managing the Lifetime of Data and Resources
 
 ### Conclusion
+
+### Potential Further Work
+
+The following are just various ideas I've had for extending the API
