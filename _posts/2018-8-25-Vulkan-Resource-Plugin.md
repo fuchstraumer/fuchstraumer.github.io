@@ -3,7 +3,7 @@ layout: post
 date: 2018-8-25
 title: "Making a Vulkan Resource Plugin"
 img: cascades.jpg
-published: false
+published: true
 tags: [C++, Engine Development, Vulkan, Plugins]
 ---
 
