@@ -146,8 +146,52 @@ There's no destructor explicitly defined, but the copy constructor and copy assi
 The transferring of data from the `UploadBuffer` structures into the actual destination resources is done by the `TransferSystem` - itself a thin wrapper over a `vpr::CommandPool` and some thread-safety related items (addressed later). Once we have our upload buffer populated, we use the `TransferSystem` to retrieve a `VkCommandBuffer` that we can record transfer commands into like so:
 
 {% highlight cpp %}
-
+auto cmd = transfer_system.TransferCmdBuffer();        
+const VkBufferCreateInfo* p_info = 
+    reinterpret_cast<VkBufferCreateInfo*>(resource->Info);
+const VkBufferMemoryBarrier memory_barrier0 {
+    VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+    nullptr,
+    0,
+    VK_ACCESS_TRANSFER_WRITE_BIT,
+    VK_QUEUE_FAMILY_IGNORED,
+    VK_QUEUE_FAMILY_IGNORED,
+    reinterpret_cast<VkBuffer>(resource->Handle),
+    0,
+    p_info->size
+};
+vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 
+    0, 0, 0, 1, &memory_barrier0, 0, nullptr);
+std::vector<VkBufferCopy> buffer_copies(num_data);
+VkDeviceSize offset = 0;
+for (size_t i = 0; i < num_data; ++i) {
+    buffer_copies[i].size = initial_data[i].DataSize;
+    buffer_copies[i].dstOffset = offset;
+    buffer_copies[i].srcOffset = offset;
+    offset += initial_data[i].DataSize;
+}
+vkCmdCopyBuffer(cmd, upload_buffer->Buffer, reinterpret_cast<VkBuffer>(resource->Handle), 
+    static_cast<uint32_t>(buffer_copies.size()), buffer_copies.data());
+const VkBufferMemoryBarrier memory_barrier1 {
+    VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+    nullptr,
+    VK_ACCESS_TRANSFER_WRITE_BIT,
+    accessFlagsFromBufferUsage(p_info->usage),
+    VK_QUEUE_FAMILY_IGNORED,
+    VK_QUEUE_FAMILY_IGNORED,
+    (VkBuffer)resource->Handle,
+    0,
+    p_info->size
+};
+vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
+    0, 0, nullptr, 1, &memory_barrier1, 0, nullptr);
 {% endhighlight %}
+
+There's a lot to process here, so lets go through it step by step. First, we retrieve the `VkBufferCreateInfo` belonging to our destination resource: from this, we get the size of the buffer so that we can create an appropriate `VkBufferMemoryBarrier` to protect the resource from incorrect or improper writes. After executing/using this memory barrier, we then proceed to generate the series of `VkBufferCopy` structures we shall need to perform a full copy between the staging resource and the destination resource: in this case, we just need to specify the size of each "chunk" of data being uploaded, and our offset into both the source and destination buffers is just how much we've transferred thus far.
+
+From there, we execute `vkCmdCopyBuffer` to finalize the data transfer. We close out with another `VkBufferMemoryBarrier` structure being created - with a minor change. We need to specify the "access flags" in each memory barrier, so that the API knows how we plan to access this buffer after the transfer is complete (which can be important to the driver, for one thing). We don't have any easy way to have the user specify these access flags however, and we can't just settle on some massive bitfield of all potential uses (could be a nightmare for performance, like using any of the `GENERAL` usage/access flags). Instead, we `accessFlagsFromBufferUsage` to back out our likely access flags from the usage flags set in the `VkBufferCreateInfo` structure we retrieved earlier.
+
+Luckily, identifying our access flags using the `VK_BUFFER_USAGE_` series of flags is really quite easy - there's a nearly 1-to-1 mapping between the two in this case, so a simple if-else if series of statements is all we ultimately need. For our default case, we just `VK_ACCESS_MEMORY_READ_BIT` - and if we're incorrect, it's likely that the Vulkan validation layers will help us identify a correct setting and amend the issue quickly.
 
 #### Copying Into Device-Local Memory for Images
 
