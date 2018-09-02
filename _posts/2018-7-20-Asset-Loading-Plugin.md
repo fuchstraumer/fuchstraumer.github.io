@@ -1,7 +1,7 @@
 ---
 layout: post
 date: 2018-7-20
-title: "Making an Asset Loader Plugin in C++"
+title: "Making a Multithreaded Asset Loader Plugin in C++"
 img: brick_mountains.jpg
 published: true
 tags: [C++, Engine Development, Vulkan, Plugins]
