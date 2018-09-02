@@ -195,7 +195,31 @@ Luckily, identifying our access flags using the `VK_BUFFER_USAGE_` series of fla
 
 #### Copying Into Device-Local Memory for Images
 
+The above showed most of the process, and some of the infrastructure required, for copying data into `VkBuffer`s. The process for images is nearly the same with only a few minor tweaks: first, we use a `VkBufferImageCopy` structure (unsurprisingly) in place of our `VkBufferCopy` structure we previously used. These structures require the mip level and array layer of a given copy - meaning that our addition of a `gpu_image_resource_data_t` structure containing these fields was just as important as we initially thought. 
+
+Second, using memory barriers becomes more important, especially using a barrier to complete the transfer. In Vulkan, images have specified "layouts" that affect how they may be used by the GPU and API: oftentimes, this information can be used by the driver to change where it places an image in memory or how it prepares it for optimal access. Memory barriers are used on images to transfer them between layouts, and it is ultimately required that we get an image into a transfer-optimal layout (`VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL`) before trying to write into it: in which case, the write may fail entirely or we may see bizarre results in the final image (and the validation layers will *absolutely* make us aware of our mistake). Once done transferring, then, it is vital that we transfer the image out of a transfer-only layout and into the layout that reflects how it will ultimately be used.
+
+{% highlight cpp %}
+const VkImageMemoryBarrier barrier1{
+    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+    nullptr,
+    VK_ACCESS_TRANSFER_WRITE_BIT,
+    accessFlagsFromImageUsage(info->usage),
+    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    imageLayoutFromUsage(info->usage),
+    device->QueueFamilyIndices.Transfer,
+    device->QueueFamilyIndices.Graphics,
+    reinterpret_cast<VkImage>(resource->Handle),
+    VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 
+        info->mipLevels, 0, info->arrayLayers }
+};
+{% endhighlight %}
+
+`accessFlagsFromImageUsage` is the same as our similarly-named method for buffers - we just use the `VkImageUsageFlags` field of the resource's `VkCreateInfo` structure to back out the likely access flags, and hope that any errors can be caught by the validation layers for fixes down-the-road. `imageLayoutFromUsage` performs a similar task, and thankfully it ends up being even simpler than the access flags - there are only a few possibilities, and in worst-case scenarios we can fall back on the `VK_IMAGE_LAYOUT_GENERAL` flag. However, this layout comes with potential performance implications - so we make sure to log a relatively high-priority warning to the console when this occurs, so developers or users can amend whatever cause the code to choose this as a valid setting.
+
 ### Step 4: Destroying Vulkan Resources
+
+With our resources created and their initial data set, we can then freely proceed to use them - and once done, destroy them.
 
 ### Thread-Safety
 
