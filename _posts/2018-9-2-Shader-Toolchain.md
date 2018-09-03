@@ -86,7 +86,7 @@ Further, by tracking this data at a slightly higher level and between multiple i
 
 However, there is one problem I have not yet solved. One still has to make sure that compatability between shader resources is maintained between all resources that may use a given set of resources: for example, let's say I perform the binding shuffling I briefly mentioned earlier (where I suggested adding a uniform buffer). I can't just modify a single shader doing that - I have to then modify all shaders that bind to that particular descriptor set. Sure, I could create an all-new unique descriptor set just for that single shader: but, descriptor set binding is one of the more expensive operations we can perform in Vulkan so it's more ideal for use to keep our descriptors pooled, to reduce binding changes. But copying and pasting code around, and remembering to always do so, is less than ideal as well. So, how do we fix this?
 
-###### A Brief Aside: spirv-cross
+#### A Brief Aside: spirv-cross
 
 I'd like to take a moment to quickly speak positively of `spirv-cross` and it's maintainers, especially Hans: I created [an issue](https://github.com/KhronosGroup/SPIRV-Cross/issues/551) explaining a lack of documentation or examples on using the API. I had personally figured out how to use the library for reflection, but it had taken a fair bit of experimentation and laborious crawling through the code to do so. I mentioned this on reddit and Hans suggested I create the issue I did, and after doing so he got right on it and created the rather immensely useful [examples for reflection](https://github.com/KhronosGroup/SPIRV-Cross/wiki/Reflection-API-user-guide) that one can now find in the wiki. Point of this sidebar being: take the time to speak to people about their libraries or projects! If you feel its lacking documentation or examples, the best way you can let someone know is by creating an issue on github in my opinion. Give it a shot!
 
@@ -94,15 +94,23 @@ I'd like to take a moment to quickly speak positively of `spirv-cross` and it's 
 
 In order to get around this problem, we can move to a generative shader approach: this makes plenty of sense, and is one that most shader toolchain software packages end up using anyways. As I am singular person, however, I'll avoid the highly abstracted approach of Unity and Unreal Engine: as great as that can be, the scope of work required is simply far too immense for me to manage among all my other work.
 
-So, my goal became generating just the resource declarations per-shader: users will still have to write the `main()` block as they would otherwise, but dealing with the intricacies and irritations of Vulkans resource binding model would be effectively removed. Additionally, we could take this chance to add simple things like simpler handling of specialization constants, `#include` support, and other various pre-processor features (as we are now writing a GLSL preprocessor). So, let's get to work.
+So, my goal became generating just the resource declarations per-shader: users will still have to write the `main()` block as they would otherwise, but dealing with the intricacies and irritations of Vulkans resource binding model would be effectively removed. Additionally, we could take this chance to add simple things like simpler handling of specialization constants, `#include` support, and other various pre-processor features (as we are now writing a GLSL preprocessor) all to reduce the difficulty of writing shaders. So, let's get to work.
 
 #### Specialization Constants
 
 I'm going to skip over detailing how I implemented `#include` support - it's nothing too shocking to anyone who's been doing development work for a while, so I'll just skip right into something more interesting. Vulkan has these interesting objects called "specialization constants" - constant values in the shader that are bound to specified locations, a bit like descriptor resources. What makes them unique, however, is that the value can be modified at pipeline creation time. This is fairly powerful, as it lets you write one shader then potentially vary the behavior shortly before you use it: potentially allowing for the "generation" of shader permutations and variations at runtime. I personally tend to use it for holding values like the screen size, and other environmental constants that don't frequently change: when they do change (e.g, during a swapchain recreation event) we would have to recreate our pipelines anyways - allowing us to update the value to reflect the new screen size, for example.
 
-However, it can be a bit annoying and tedious to type out `layout (constant_id = (idx))` for each of the specialization constants we intend to use. Additionally, I figured (correctly!) that practicing on this feature would help me prepare for the more difficult world of descriptors and those resources. 
+However, it can be a bit annoying and tedious to type out `layout (constant_id = (idx))` for each of the specialization constants we intend to use. Additionally, I figured (correctly!) that practicing on this feature would help me prepare for the more difficult world of descriptors and those resources. Currently, one declares a specialization constant quite simply: `SPC (TYPE) (NAME) = (VALUE)` will do the trick. From there, the shader generation system work
 
 #### Resource Groups, v1.0
 
 #### Resource Groups - Lua version
 
+## Potential Improvements 
+
+- Better handling of vertex interfaces and inter-stage interfaces
+- Improved Lua integration: fairly "singleton"-esque right now
+- Move specialization constants to Lua system as well
+- Lots of opportunities for cleanup and performance improvements
+- Run a multithreaded compile step for shader groups
+- Implement caching, by loading files back up from a specified directory
