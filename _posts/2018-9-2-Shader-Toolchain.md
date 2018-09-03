@@ -65,7 +65,7 @@ So these issues motivated the initial work into ShaderTools: let's take our pre-
 
 ## Shader Reflection - the Beginnings
 
-If one wants to perform reflection on SPIR-V shaders, you're going to have to use the [spirv-cross]() library. By feeding it a SPIR-V binary blob, one can query the library and get access to *all* of the resources used by a shader. From here, it's only a matter of collating this data across multiple stages (usually just vertex + fragment) and generating the relevant data: in initial versions of my library, the literally meant just generating the arrays of `VkDescriptorSetLayoutBinding`s one would require for a given combination of shaders. 
+If one wants to perform reflection on SPIR-V shaders, you're going to have to use the [spirv-cross](https://github.com/KhronosGroup/SPIRV-Cross) library. By feeding it a SPIR-V binary blob, one can query the library and get access to *all* of the resources used by a shader. From here, it's only a matter of collating this data across multiple stages (usually just vertex + fragment) and generating the relevant data: in initial versions of my library, the literally meant just generating the arrays of `VkDescriptorSetLayoutBinding`s one would require for a given combination of shaders. 
 
 {% highlight cpp %}
 const size_t num_descriptor_sets = reflectionSystem->GetNumDescriptorSets();
@@ -85,6 +85,10 @@ Further, by tracking this data at a slightly higher level and between multiple i
 ### Potential Issues
 
 However, there is one problem I have not yet solved. One still has to make sure that compatability between shader resources is maintained between all resources that may use a given set of resources: for example, let's say I perform the binding shuffling I briefly mentioned earlier (where I suggested adding a uniform buffer). I can't just modify a single shader doing that - I have to then modify all shaders that bind to that particular descriptor set. Sure, I could create an all-new unique descriptor set just for that single shader: but, descriptor set binding is one of the more expensive operations we can perform in Vulkan so it's more ideal for use to keep our descriptors pooled, to reduce binding changes. But copying and pasting code around, and remembering to always do so, is less than ideal as well. So, how do we fix this?
+
+###### A Brief Aside: spirv-cross
+
+I'd like to take a moment to quickly speak positively of `spirv-cross` and it's maintainers, especially Hans: I created [an issue](https://github.com/KhronosGroup/SPIRV-Cross/issues/551) explaining a lack of documentation or examples on using the API. I had personally figured out how to use the library for reflection, but it had taken a fair bit of experimentation and laborious crawling through the code to do so. I mentioned this on reddit and Hans suggested I create the issue I did, and after doing so he got right on it and created the rather immensely useful [examples for reflection](https://github.com/KhronosGroup/SPIRV-Cross/wiki/Reflection-API-user-guide) that one can now find in the wiki. Point of this sidebar being: take the time to speak to people about their libraries or projects! If you feel its lacking documentation or examples, the best way you can let someone know is by creating an issue on github in my opinion. Give it a shot!
 
 ## Shader Generation
 
