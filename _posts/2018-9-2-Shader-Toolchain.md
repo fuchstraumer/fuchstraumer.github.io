@@ -7,7 +7,7 @@ published: true
 tags: [C++, tools, Vulkan, Shaders, SPIR-V, Lua]
 ---
 
-As an early pre-article note: I have written various versions of this article about three times now. ShaderTools has evolved *so* much from it's initial versions, and is constantly improving, so it was hard to ever feel it was "ready" to share. Or, I'd write half the content I needed then realize that (usually) I had written some new feature or fix that solved a problem I mentioned in the writing. So, here goes nothing: and hopefully, this ages well.
+As an early pre-article note: I have written various versions of this article about three times now. ShaderTools has evolved *so* much from it's initial versions, and is constantly improving, so it was hard to ever feel it was "ready" to share. Or, I'd write half the content I needed then realize that (usually) I had written some new feature or fix that solved a problem I mentioned in the writing - like the resource group system. That has gone through so many variations and iterations that I could write a whole article *just* on that content. So, here goes nothing: and hopefully, this ages well.
 
 # Toolchains: the Reality of Engine Development
 
@@ -92,6 +92,13 @@ In order to get around this problem, we can move to a generative shader approach
 
 So, my goal became generating just the resource declarations per-shader: users will still have to write the `main()` block as they would otherwise, but dealing with the intricacies and irritations of Vulkans resource binding model would be effectively removed. Additionally, we could take this chance to add simple things like simpler handling of specialization constants, `#include` support, and other various pre-processor features (as we are now writing a GLSL preprocessor). So, let's get to work.
 
-#### #include Support
+#### Specialization Constants
 
-For this next bit, I'm going to proceed in an order of decreasing complexity to increasing complexity - so let's start with the simplest feature we can support, `#include`s.
+I'm going to skip over detailing how I implemented `#include` support - it's nothing too shocking to anyone who's been doing development work for a while, so I'll just skip right into something more interesting. Vulkan has these interesting objects called "specialization constants" - constant values in the shader that are bound to specified locations, a bit like descriptor resources. What makes them unique, however, is that the value can be modified at pipeline creation time. This is fairly powerful, as it lets you write one shader then potentially vary the behavior shortly before you use it: potentially allowing for the "generation" of shader permutations and variations at runtime. I personally tend to use it for holding values like the screen size, and other environmental constants that don't frequently change: when they do change (e.g, during a swapchain recreation event) we would have to recreate our pipelines anyways - allowing us to update the value to reflect the new screen size, for example.
+
+However, it can be a bit annoying and tedious to type out `layout (constant_id = (idx))` for each of the specialization constants we intend to use. Additionally, I figured (correctly!) that practicing on this feature would help me prepare for the more difficult world of descriptors and those resources. 
+
+#### Resource Groups, v1.0
+
+#### Resource Groups - Lua version
+
