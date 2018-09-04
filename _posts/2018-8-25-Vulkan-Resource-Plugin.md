@@ -1,8 +1,8 @@
 ---
 layout: post
 date: 2018-8-25
-title: "Making a Vulkan Resource Plugin"
-img: cascades.jpg
+title: "Making a Vulkan Resource Plugin in C++"
+img: river_mountain.jpg
 published: true
 tags: [C++, Engine Development, Vulkan, Plugins]
 ---
@@ -272,9 +272,11 @@ Thread-safety for container insertion (for containers used for storing our `Vulk
 
 So far I've mentioned the transfer system briefly and not in terrible detail - but there are a few more details worth going into. Initial testruns showed that I was spending quite a bit of CPU time calling `vkQueueSubmit` through the transfer system - even though there weren't any actual transfers occuring, as the singular `VkCommandBuffer` we were using didn't have any transfers recorded into it. This occured as our plugin has a function called `LogicalUpdate` that is called every frame, at the beginning of the frame, without any delta-time information: it's intended for internal plugin state updating and the like, so in the case of this plugin I had placed a `TransferSystem::CompleteTransfers` call and a call to flush our staging buffers within it (so, we transfer all our data then clear all the `UploadBuffer` structures we created for these transfers).
 
-The fix ended up being really quite simple: set a flag to mark the attached command buffer as dirty, which is only set if `TransferSystem::TransferCmdBuffer()` is called. Then, when `TransferSystem::CompleteTransfers` we can check to see if this flag has been set - if so, we have work to submit and we proceed with a call to `vkQueueSubmit`. After that, we reset our flag to mark the command buffer as unused. 
+The fix ended up being really quite simple: set a flag to mark the attached command buffer as dirty, which is only set if `TransferSystem::TransferCmdBuffer()` is called. Then, when `TransferSystem::CompleteTransfers` we can check to see if this flag has been set - if so, we have work to submit and we proceed with a call to `vkQueueSubmit`. After that, we reset our flag to mark the command buffer as unused. This small change helped save a considerable amount of CPU time - it may not have been that large of an issue, but it seemed like something worth addressing regardless.
 
 ### Conclusion
+
+Hopefully this post helps with insight into how to design a similar system - managing resources in the new explicit graphics APIs is not the simplest challenge to confront, and it's fairly easy to back oneself into a corner (as I did, with VulpesRender initially) without considering potential issues down the road. As always, I welcome criticism, questions, and comments: I already have a fairly large suite of improvements I'd love to make, and I'm sure there are things I've done that could be done better (so please, let me know!). The source code of the relevant plugin can be found as part of the `resource_context` plugin in Caelestis, [here](https://github.com/fuchstraumer/Caelestis/tree/master/plugins/resource_context). The relevant source files will be "TransferSystem", "ResourceTypes", and "ResourceContext". If you're curious how the API for this plugin looks, that will simply be in `ResourceContextAPI.hpp`.
 
 ### Potential Further Work
 
