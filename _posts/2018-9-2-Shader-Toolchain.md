@@ -160,7 +160,31 @@ I didn't explicitly note it earlier, but due to the large amount of dependencies
 Instead, through some cheeky usage of RAII and `strdup` we can get a nice and safe way to retrieve strings across a DLL, while retaining a C ABI. The solution is a structure like this:
 
 {% highlight cpp %}
+struct ST_API dll_retrieved_strings_t {
+    dll_retrieved_strings_t(const dll_retrieved_strings_t&) = delete;
+    dll_retrieved_strings_t& operator=(const dll_retrieved_strings_t&) = delete;
+    dll_retrieved_strings_t();
+    ~dll_retrieved_strings_t();
+    dll_retrieved_strings_t(dll_retrieved_strings_t&& other) noexcept;
+    dll_retrieved_strings_t& operator=(dll_retrieved_strings_t&& other) noexcept;
+    void SetNumStrings(const size_t& num_names);
+    const char* operator[](const size_t& idx) const;
+    char** Strings{ nullptr };
+    size_t NumStrings{ 0 };
+};
 
+// in use, in the DLL:
+dll_retrieved_strings_t ShaderPack::GetShaderGroupNames() const {
+    dll_retrieved_strings_t names;
+    names.SetNumStrings(impl->groups.size());
+    size_t i = 0;
+    for (auto& group : impl->groups) {
+        names.Strings[i] = strdup(group.first.c_str());
+        ++i;
+    }
+
+    return names;
+}
 {% endhighlight %}
 
 In case you were unaware, `strdrup` copies the strings and requires eventually calling `free` on the destination string pointers. I didn't want to enforce users to have to remember this step though, so by making the destructor of the `dll_retrieved_strings_t` structure call this (along with deleting it's copy constructor + assignment operator) we can effectively avoid leaking memory when passing these strings around. The easiest way to use it is by declaring a new scope with brackets (`{}`), copying the strings into local storage, then exiting the brackets and letting the retrieved strings be cleaned up. It's an idea I got again from `std::lock_guard`, and it works splendidly! And in case you can't tell, I'm fairly proud of my clever little trick :)
