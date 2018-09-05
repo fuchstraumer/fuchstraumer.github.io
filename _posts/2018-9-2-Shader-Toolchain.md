@@ -138,6 +138,8 @@ The above declares a resource group. During the shader generation process, I sea
 
 #### Resource Groups - Lua version
 
+#### Automating Resource Creation and Population (Sometimes!)
+
 ## Potential Improvements 
 
 - Better handling of vertex interfaces and inter-stage interfaces
