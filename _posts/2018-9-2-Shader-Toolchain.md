@@ -142,7 +142,7 @@ The rendergraph really needs to know when resources are read, and when they are 
 
 #### Resource Groups - Attempt #2
 
-First, I knew I would need to improve how I handled resources. 
+First, I knew I would need to improve how I handled resources. We would now have to start tracking resources 
 
 #### Resource Groups - Lua version
 
@@ -150,7 +150,24 @@ First, I knew I would need to improve how I handled resources.
 
 #### Extracting Even More Metadata
 
+##### Getting Strings Across A DLL Boundary
 
+I didn't explicitly note it earlier, but due to the large amount of dependencies ShaderTools requires I was rather determined to make this project work as a DLL/shared library - so that clients wouldn't have to also link to our huge pile of dependencies. This creates some restrictions though: for example, as I noted above we often want to retrieve the names of our resources and even the resource group they're in as strings. But how do we pass or retrieve strings across a DLL boundary? Just writing to an array of `const char*` pointers can be dangerous and expensive, as then we have to 
+
+- make sure the pointers remain valid by storing copies of the strings somewhere
+- potentially copy what would've been temporary data into more permanent storagea
+
+Instead, through some cheeky usage of RAII and `strdup` we can get a nice and safe way to retrieve strings across a DLL, while retaining a C ABI. The solution is a structure like this:
+
+{% highlight cpp %}
+
+{% endhighlight %}
+
+In case you were unaware, `strdrup` copies the strings and requires eventually calling `free` on the destination string pointers. I didn't want to enforce users to have to remember this step though, so by making the destructor of the `dll_retrieved_strings_t` structure call this (along with deleting it's copy constructor + assignment operator) we can effectively avoid leaking memory when passing these strings around. The easiest way to use it is by declaring a new scope with brackets (`{}`), copying the strings into local storage, then exiting the brackets and letting the retrieved strings be cleaned up. It's an idea I got again from `std::lock_guard`, and it works splendidly! And in case you can't tell, I'm fairly proud of my clever little trick :)
+
+## ShaderPacks, Shaders, and ShaderStages
+
+Now with a full-featured resource system that allows for fully automated 
 
 ## Potential Improvements 
 
