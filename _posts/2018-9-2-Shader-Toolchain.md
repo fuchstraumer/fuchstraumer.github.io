@@ -140,11 +140,10 @@ I began wondering, however, if I could take this library further. It was about t
 
 The rendergraph really needs to know when resources are read, and when they are written to. And if a certain shader only performs pure reads, or pure writes, this can be *immensely* helpful for scheduling the various steps in our rendering process (as shown). Additionally, I believed that with a little work I should be able to automate the resource creation process as well - so that we could use our shaders to hook into something like a [Vulkan resource plugin](https://fuchstraumer.github.io/Vulkan-Resource-Plugin/). Through this, not only are we generating the descriptor sets, descriptor set layouts, pipeline layouts, and descriptor pools (a huge chunk of work we would otherwise compile in to our code!) - we can now generate the requisite resources automatically and based on some input data, too! This was an exciting prospect so I got right to work.
 
-#### Resource Groups - Attempt #2
+#### Resource Groups from Lua Scripts
 
-First, I knew I would need to improve how I handled resources. We would now have to start tracking resources 
-
-#### Resource Groups - Lua version
+(example to link for functions/environment interface: [here](https://github.com/fuchstraumer/ShaderTools/blob/b1ff1c7c019f24ef08a22c0821225eb12592d46f/fragments/clustered_forward/Functions.lua))
+(example to link for resource group script: [here](https://github.com/fuchstraumer/ShaderTools/blob/b1ff1c7c019f24ef08a22c0821225eb12592d46f/fragments/clustered_forward/Resources.lua))
 
 #### Automating Resource Creation and Population (Sometimes!)
 
