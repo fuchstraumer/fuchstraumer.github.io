@@ -138,7 +138,11 @@ I began wondering, however, if I could take this library further. It was about t
 
 <img src="{{site.baseurl}}/assets/img/RenderGraph.png" alt="I am eternally proud of this infographic, honestly" />
 
+The rendergraph really needs to know when resources are read, and when they are written to. And if a certain shader only performs pure reads, or pure writes, this can be *immensely* helpful for scheduling the various steps in our rendering process (as shown). Additionally, I believed that with a little work I should be able to automate the resource creation process as well - so that we could use our shaders to hook into something like a [Vulkan resource plugin](https://fuchstraumer.github.io/Vulkan-Resource-Plugin/). Through this, not only are we generating the descriptor sets, descriptor set layouts, pipeline layouts, and descriptor pools (a huge chunk of work we would otherwise compile in to our code!) - we can now generate the requisite resources automatically and based on some input data, too! This was an exciting prospect so I got right to work.
+
 #### Resource Groups - Attempt #2
+
+First, I knew I would need to improve how I handled resources. 
 
 #### Resource Groups - Lua version
 
@@ -146,7 +150,7 @@ I began wondering, however, if I could take this library further. It was about t
 
 #### Extracting Even More Metadata
 
-The rendergraph really needs to know when resources are read, and when they are written to. And if a certain shader only performs pure reads, or pure writes, this can be *immensely* helpful for scheduling
+
 
 ## Potential Improvements 
 
