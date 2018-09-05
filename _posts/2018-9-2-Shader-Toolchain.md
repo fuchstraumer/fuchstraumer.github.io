@@ -1,9 +1,9 @@
 ---
 layout: post
-date: 2018-9-2
+date: 2018-9-5
 title: "Creating and Designing a Shader Toolchain"
 img: aurora.jpg
-published: false
+published: true
 tags: [C++, tools, Vulkan, Shaders, SPIR-V, Lua]
 ---
 
@@ -140,14 +140,143 @@ I began wondering, however, if I could take this library further. It was about t
 
 The rendergraph really needs to know when resources are read, and when they are written to. And if a certain shader only performs pure reads, or pure writes, this can be *immensely* helpful for scheduling the various steps in our rendering process (as shown). Additionally, I believed that with a little work I should be able to automate the resource creation process as well - so that we could use our shaders to hook into something like a [Vulkan resource plugin](https://fuchstraumer.github.io/Vulkan-Resource-Plugin/). Through this, not only are we generating the descriptor sets, descriptor set layouts, pipeline layouts, and descriptor pools (a huge chunk of work we would otherwise compile in to our code!) - we can now generate the requisite resources automatically and based on some input data, too! This was an exciting prospect so I got right to work.
 
-#### Resource Groups from Lua Scripts
+### Resource Groups from Lua Scripts
 
-(example to link for functions/environment interface: [here](https://github.com/fuchstraumer/ShaderTools/blob/b1ff1c7c019f24ef08a22c0821225eb12592d46f/fragments/clustered_forward/Functions.lua))
-(example to link for resource group script: [here](https://github.com/fuchstraumer/ShaderTools/blob/b1ff1c7c019f24ef08a22c0821225eb12592d46f/fragments/clustered_forward/Resources.lua))
+Despite the logic above, my first goal with the upgrades I had planned was to automate resource creation - and in order to do that, I was going to have to really upgrade my resource groups. First, the current system just felt sort of ungainly - I wasn't really a fan of it, and felt that it could have been designed better. While ShaderTools might not be at the level of being used by artists, I could see it being used as a middleware translation between some sort of material/node editor and the final shader code: so simplification is just going to make interfacing to higher-level abstractions easier.
 
-#### Automating Resource Creation and Population (Sometimes!)
+At first, I thought I could use JSON to describe resource groups. But that quickly fell apart: in order to create a `VkBuffer`, we need to know the size of the buffer. And there are many cases where this size depends on some runtime parameters (usually any time you're doing compute/lighting work) like the current screens size or the depth range - or, it might just be a configurable value like a maximum number of lights that we adjust based on the user's graphics configuration. Regardless, there was no easy to handle this in JSON - I'm effectively describing a need for functions.
 
-#### Extracting Even More Metadata
+But then I had a realization: Lua is fast with key-value tables, especially LuaJIT, and Lua lets me use functions as table fields. This would be *perfect*. I could expose some environment functions like `GetWindowSizeX` to Lua, and call them to set fields of my resource descriptors. Further, I could be fairly certain that while executing a Lua script might not be nearly as fast as simply parsing some JSON it's unlikely that it'll be so slow as to massively impact runtime performance.
+
+The format I settled on works like so - first, we can of course declare all our functions in a separate Lua script. Here, I call functions called "GetWindowX()" and "GetWindowY()" that get the size in pixels of our current rendertarget - and use that to calculate tile dimensions for clustered forward rendering. I also store a few other members, which could potentially be adjusted at runtime by reading from a configuration or the like:
+
+{% highlight lua %}
+local dimensions = {
+    NumLights = 2048;
+    TileWidth = 64;
+    TileHeight = 64;
+};
+
+function dimensions.TileCountX()
+    return (GetWindowX() - 1) / dimensionFunctions.TileWidth + 1;
+end
+
+function dimensions.TileCountY()
+    return (GetWindowY() - 1) / dimensionFunctions.TileHeight + 1;
+end
+
+function dimensions.TileCountZ()
+    return 256;
+end
+
+function dimensions.GetTileSizes()
+    return dimensions.TileCountX(), dimensions.TileCountY(), dimensions.TileCountZ();
+end
+
+function dimensions.GetTotalTileCount()
+    x, y, z = dimensions.GetTileSizes();
+    return x * y * z;
+end
+
+return dimensions;
+{% endhighlight %}
+
+Our resource script is then able to use these functions by using the standard Lua "requires" format. A resource script is what we use to declare our resource groups now, instead of the rather ungainly `#pragma BEGIN_RESOURCES` format. It makes the specification of all our metadata loads easier: field names make it clear what we can write, and adding custom structured buffer types becomes easier too (more on that later!):
+
+{% highlight lua %}
+local dimensions = require("Functions")
+-- Reduced for brevity, but you get the point
+Resources = {
+    GlobalResources = {
+        UBO = {
+            Type = "UniformBuffer",
+            Members = {
+                model = { "mat4", 0 },
+                view = { "mat4", 1 },
+                projectionClip = { "mat4", 2 },
+                normal = { "mat4", 3 },
+                viewPosition = { "vec4", 4 },
+                depth = { "vec2", 5 },
+                numLights = { "uint", 6 }
+            }
+        }
+    },
+    ClusteredForward = {
+        flags = {
+            Type = "StorageTexelBuffer",
+            Format = "r8ui",
+            Size = dimensions.TotalTileCount(),
+            Qualifiers = "restrict"
+        },
+        bounds = {
+            Type = "StorageTexelBuffer",
+            Format = "r32ui",
+            Size = dimensions.NumLights * 6,
+            Qualifiers = "restrict"
+        },
+        Tags = { "InitializeToZero", "ClearAtEndOfPass" }
+    },
+    Lights = {
+        positionRanges = {
+            Type = "StorageTexelBuffer",
+            Format = "rgba32f",
+            Size = dimensions.NumLights,
+            Qualifiers = "restrict readonly",
+            Tags = { "HostGeneratedData" }
+        }
+        lightColors = {
+            Type = "UniformTexelBuffer",
+            Format = "rgba8",
+            Size = dimensions.NumLights,
+            Qualifiers = "restrict readonly",
+            Tags = { "HostGeneratedData" }
+        }
+    }
+}
+{% endhighlight %}
+
+During execution of the script, we simply iterate through the entries of the "Resources" table. Then, we recurse through their individual entries and extract all the data we need. We are then able to build both the information we need for generating the descriptor layout/binding data we had earlier, but we now also have some extras like the ability to add qualifers and a size field. That size field is really the only item we actually *need* to generate the backing resources though, as we can technically populate the fields of things like `VkBufferCreateInfo` (and `VkBufferViewCreateInfo` for our texel buffers) already.
+
+#### Handling Edge Cases and Unique Behavior
+
+You are probably wondering what the `Tags` field is about - this is a field that I added fairly late in the development process, after realizing I couldn't quite cover everything I wanted to do with the existing infrastructure. The intended use it to further specialize individual resources and groups using user-defined "tags": these tags are stored then on a per-group and per-shader basis, and can be used by clients interacting with `ShaderTools` to mutate how they use the resources.
+
+For example, lets consider my attachment of the "HostGeneratedData" tag to the Lights resources. Instead of using this tag to change behavior in the backend, the intent is for a user to do something like the following (using the `ShaderResource` object found [here](https://github.com/fuchstraumer/ShaderTools/blob/6f409a4ad66ecc886258b711589e967ca8b00566/include/core/ShaderResource.hpp)):
+
+{% highlight cpp %}
+void BufferResourceCache::createBuffer(const st::ShaderResource* rsrc) {
+    VkBufferCreateInfo create_info{ default_buffer_info };
+    create_info.usage = usageFlagsFromDescriptorType(rsrc->DescriptorType());
+    create_info.size = rsrc->MemoryRequired();
+
+    {
+        st::dll_retrieved_strings_t tags = rsrc->GetTags();
+        if (tags.NumStrings != 0) {
+            for (size_t i = 0; i < tags.NumStrings; ++i) {
+                if (strcmp(tags[i], "HostGeneratedData")) {
+                    // Since it's host generated data, mutate usage flags
+                    // so that we can copy into it from the host
+                    create_info.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+                }
+            }
+        }
+    }
+
+    // should be using a view_info param here but skipped for brevity
+    VulkanResource* new_buffer = resourcePluginAPI->CreateBuffer(&create_info, nullptr, 
+        0, nullptr, memory_type::DEVICE_LOCAL, nullptr);
+}
+{% endhighlight %}
+
+In this way, we can attach further metadata and then evolve unique behaviors based on that data without having to modify the backend library doing all this parsing. The above probably isn't the most ideal case and this probably is not the best or most performant way to handle this, but I didn't feel like it was wise to start modifying ShaderTools deeply to accomodate the premise of these tags. So in the end I think I leaving it to the user to do things like the above makes the most sense. In the case of the other tags, like the one attached to the `ClusteredForward` group, we would make note of this (on the rendegraph or client level, of course) and then be sure to fill the buffers in questions with zeros, and schedule another clear/fill to zero operation at the end of each renderpass. I do have other ideas, however: like potentially making the tags field cause the execution of a secondary script, which can be used to modify the resource as appropriate to include the appropriate fields (maybe by potentially reaching in and directly mutating a `VkBufferCreateInfo`?). Unfortunately, I haven't yet had time to further explore this idea. The farther I got was using the tags field to call a `std::function` object that was stored in a `std::unordered_map<std::string, std::function<void(st::ShaderResource*)>>` (thus used to mutate the passed resource): this accomplishes the same end result, but still is less data-driven than I would prefer since the functions we call are compiled code.
+
+#### Handling Structured Buffers
+
+The `UBO` structure in the above snippet of the shader resource script probably looked a little weird: first I had the buffers member name, and then the field was another Lua table containing a type string and an index. This combo looks messy, but the index is unfortunately required: Lua uses unordered tables, so the order of the members may otherwise end up scrambled and confused. 
+
+### Automating Resource Creation and Population (Sometimes!)
+
+### Extracting Even More Metadata
 
 ##### Getting Strings Across A DLL Boundary
 
@@ -192,11 +321,18 @@ In case you were unaware, `strdrup` copies the strings and requires eventually c
 
 Now with a full-featured resource system that allows for fully automated 
 
+#### Creating Descriptor Pools
+
+
+
 ## Potential Improvements 
 
+- Something I really need to do: **resources with same names may not actually be equivalent and shouldn't have their representations merged together**
 - Better handling of vertex interfaces and inter-stage interfaces
-- Improved Lua integration: fairly "singleton"-esque right now
+- Implement tags being used to execute further scripts and mutate resources
+- Improved Lua integration: fairly "singleton"-esque right now, can get weird if client is using Lua too
 - Move specialization constants to Lua system as well
-- Lots of opportunities for cleanup and performance improvements
-- Run a multithreaded compile step for shader groups
-- Implement caching, by loading files back up from a specified directory
+- Profiling! Need to test using this live to build a bunch of shaders so I can get some good performance data from it so as to direct my optimizations
+- Run a multithreaded compile step for shader groups, since compiling with optimizations is rather expensive
+- Implement caching, by loading files back up from a specified directory (or the temporary file dump directory we use now)
+- Shader permutations! and actually enabling/using vendor extensions as appropriate. This moves to a higher-level system though, which might compromise my original vision for this project
