@@ -7,6 +7,8 @@ published: true
 tags: [C++, tools, Vulkan, Shaders, SPIR-V, Lua]
 ---
 
+**Note: This article is a WIP! If you see it, it's probably because I'm working on it at this very moment...**
+
 As an early pre-article note: I have written various versions of this article about three times now. ShaderTools has evolved *so* much from it's initial versions, and is constantly improving, so it was hard to ever feel it was "ready" to share. Or, I'd write half the content I needed then realize that (usually) I had written some new feature or fix that solved a problem I mentioned in the writing - like the resource group system. That has gone through so many variations and iterations that I could write a whole article *just* on that content. So, here goes nothing: and hopefully, this ages well.
 
 # Toolchains: the Reality of Engine Development
@@ -78,6 +80,7 @@ for (size_t i = 0; i < num_descriptor_sets; ++i) {
 }
 // assuming we have some VkDescriptorSetLayout wrapper class, we then just add the bindings:
 ourDescriptorSetLayout.AddSetLayoutBindings(setBindings[0]);
+// (repeat the above for each descriptor set and set layout we retrieved data for)
 {% endhighlight %}
 
 Further, by tracking this data at a slightly higher level and between multiple invocations of this "reflection" system, one could get an accurate count of the resources required - so setting up your `VkDescriptorPool` to perfectly match the requirements of the current suite of shaders became nearly trivial! It had the effect of reducing code complexity *and* making things much more flexible - effectively, we had incidentally moved to a data-driven design where the "data" was our shaders. This data was now affecting the behavior of our code, and our code adapted to the data instead of the other way around (or just a lack of adaptation whatsoever).
@@ -100,9 +103,38 @@ So, my goal became generating just the resource declarations per-shader: users w
 
 I'm going to skip over detailing how I implemented `#include` support - it's nothing too shocking to anyone who's been doing development work for a while, so I'll just skip right into something more interesting. Vulkan has these interesting objects called "specialization constants" - constant values in the shader that are bound to specified locations, a bit like descriptor resources. What makes them unique, however, is that the value can be modified at pipeline creation time. This is fairly powerful, as it lets you write one shader then potentially vary the behavior shortly before you use it: potentially allowing for the "generation" of shader permutations and variations at runtime. I personally tend to use it for holding values like the screen size, and other environmental constants that don't frequently change: when they do change (e.g, during a swapchain recreation event) we would have to recreate our pipelines anyways - allowing us to update the value to reflect the new screen size, for example.
 
-However, it can be a bit annoying and tedious to type out `layout (constant_id = (idx))` for each of the specialization constants we intend to use. Additionally, I figured (correctly!) that practicing on this feature would help me prepare for the more difficult world of descriptors and those resources. Currently, one declares a specialization constant quite simply: `SPC (TYPE) (NAME) = (VALUE)` will do the trick. From there, the shader generation system work
+However, it can be a bit annoying and tedious to type out `layout (constant_id = (idx))` for each of the specialization constants we intend to use. Additionally, I figured (correctly!) that practicing on this feature would help me prepare for the more difficult world of descriptors and those resources. Currently, one declares a specialization constant quite simply: `SPC (TYPE) (NAME) = (VALUE)` will do the trick. From there, the shader generation system adds the requisite `layout (constant_id = (idx))` prefix as appropriate, keeping a running tally of the current index to use per-shader. 
 
-#### Resource Groups, v1.0
+#### Simplifying Resources With Resource Groups
+
+So as was noted earlier, Vulkan resources are attached to descriptor sets: these can be thought of as a sort of semantic or logical "grouping" of these resources as well. First, it's a good idea to keep resources with similar update frequencies together in descriptor sets: this way, for example, you could bind your global per-frame data to descriptor set 0 for example, then switch out higher bindings per rendering type, then per-material, then (not ideally, but you could) per-object if you had to. But you might also group together all your resources used for compute-type tasks - e.g, clustered forward lighting and the like - into a descriptor set. I decided to use "resource groups" as my abstraction or alias over a descriptor set, and began with a fairly explicit setup like so:
+
+{% highlight glsl %}
+#pragma BEGIN_RESOURCES VOLUMETRIC_FORWARD
+UNIFORM_BUFFER cluster_data {
+    uvec3 GridDim;
+    float ViewNear;
+    uvec2 Size;
+    float Near;
+    float LogGridDimY;
+} ClusterData;
+
+U_IMAGE_BUFFER r8ui ClusterFlags;
+U_IMAGE_BUFFER r32ui PointLightIndexList;
+U_IMAGE_BUFFER r32ui SpotLightIndexList;
+U_IMAGE_BUFFER rg32ui PointLightGrid;
+U_IMAGE_BUFFER rg32ui SpotLightGrid;
+U_IMAGE_BUFFER r32ui UniqueClustersCounter;
+U_IMAGE_BUFFER r32ui UniqueClusters;
+
+#pragma END_RESOURCES VOLUMETRIC_FORWARD
+{% endhighlight %}
+
+The above declares a resource group. During the shader generation process, I search the current subfolder being used for a `Resources.glsl` file and parse it for all the resource groups I can find. I then parse from this the appropriate metadata I will need to generate the final bindings, so that when a user writes `#pragma USE_RESOURCES VOLUMETRIC_FORWARD` we insert the above resource block into their shader. This worked well enough, and combined with my pre-existing reflection infrastructure it gave me most of the capabilities I needed.
+
+## Taking the Library Further
+
+#### Resource Groups - Attempt #2
 
 #### Resource Groups - Lua version
 
