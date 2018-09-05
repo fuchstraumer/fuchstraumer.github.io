@@ -13,7 +13,7 @@ As an early pre-article note: I have written various versions of this article ab
 
 # Toolchains: the Reality of Engine Development
 
-The title just above is not a pessimistic statement - but it is the truth! Before I really dove into the challenge of attempting to make my own graphics engine, I had little idea of creating things like toolchains. My previous work projects had never required them, or weren't large enough to benefit from them. But a few early experiments with trying to implement clustered forward rendering (and looking at [volumetric tiled forward]() made it even more urgent I get this sort of system working) made it clear that I needed some help - in the form of code designed to help bridge the gap and make my life easier.
+The title just above is not a pessimistic statement - but it is the truth! Before I really dove into the challenge of attempting to make my own graphics engine, I had little idea of creating things like toolchains. My previous work projects had never required them, or weren't large enough to benefit from them. But a few early experiments with trying to implement clustered forward rendering (and looking at [volumetric tiled forward](https://www.3dgep.com/volume-tiled-forward-shading/) made it even more urgent I get this sort of system working) made it clear that I needed some help - in the form of code designed to help bridge the gap and make my life easier.
 
 With Vulkan shaders, one has to declare all the resources in a much more explicit manner. It's not just specifying the range of limited locations you might bind textures to: no, it's specifying where you bind all resources to. And not just a singular `binding` field either: since Vulkan resources are declared in "sets", that's another field that has to be specified. For some of the more complicated shaders used in the fancier rendering pipelines nowadays, you get fairly ridiculous resource binding declarations like this:
 
@@ -134,11 +134,19 @@ The above declares a resource group. During the shader generation process, I sea
 
 ## Taking the Library Further
 
+I began wondering, however, if I could take this library further. It was about this time that I was doing more reading into rendergraphs and that concept, like in [this excellent article](http://themaister.net/blog/2017/08/15/render-graphs-and-vulkan-a-deep-dive/) (from Hans Kristian, who helped me with his excellent work on spirv-cross earlier in this very article!). Effectively, a rendergraph is us dealing with the manual synchronization required in modern APIs, and has some things in common even with the AST that is created during the compiliation of something like C/C++. We atttempt to traverse a series of rendering commands, rendertargets, and resources - from this, we attempt to generate scheduling. Here's a helpful graphic I created some time ago for when I was writing a software design document explaining this concept to a crowd of embedded developers at work:
+
+<img src="{{site.baseurl}}/assets/img/RenderGraph.png" alt="I am eternally proud of this infographic, honestly" />
+
 #### Resource Groups - Attempt #2
 
 #### Resource Groups - Lua version
 
 #### Automating Resource Creation and Population (Sometimes!)
+
+#### Extracting Even More Metadata
+
+The rendergraph really needs to know when resources are read, and when they are written to. And if a certain shader only performs pure reads, or pure writes, this can be *immensely* helpful for scheduling
 
 ## Potential Improvements 
 
