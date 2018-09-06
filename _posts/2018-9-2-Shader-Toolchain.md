@@ -239,7 +239,7 @@ During execution of the script, we simply iterate through the entries of the "Re
 
 #### Handling Edge Cases and Unique Behavior
 
-You are probably wondering what the `Tags` field is about - this is a field that I added fairly late in the development process, after realizing I couldn't quite cover everything I wanted to do with the existing infrastructure. The intended use it to further specialize individual resources and groups using user-defined "tags": these tags are stored then on a per-group and per-shader basis, and can be used by clients interacting with `ShaderTools` to mutate how they use the resources.
+You are probably wondering what the `Tags` field is about - this is a field that I added fairly late in the development process, after realizing I couldn't quite cover everything I wanted to do with the existing infrastructure. The intended use is to further specialize individual resources and groups using user-defined "tags": these tags are stored then on a per-group and per-shader basis as appropriate, and can be used by clients interacting with `ShaderTools` to mutate how they use the resources.
 
 For example, lets consider my attachment of the "HostGeneratedData" tag to the Lights resources. Instead of using this tag to change behavior in the backend, the intent is for a user to do something like the following (using the `ShaderResource` object found [here](https://github.com/fuchstraumer/ShaderTools/blob/6f409a4ad66ecc886258b711589e967ca8b00566/include/core/ShaderResource.hpp)):
 
@@ -268,15 +268,31 @@ void BufferResourceCache::createBuffer(const st::ShaderResource* rsrc) {
 }
 {% endhighlight %}
 
-In this way, we can attach further metadata and then evolve unique behaviors based on that data without having to modify the backend library doing all this parsing. The above probably isn't the most ideal case and this probably is not the best or most performant way to handle this, but I didn't feel like it was wise to start modifying ShaderTools deeply to accomodate the premise of these tags. So in the end I think I leaving it to the user to do things like the above makes the most sense. In the case of the other tags, like the one attached to the `ClusteredForward` group, we would make note of this (on the rendegraph or client level, of course) and then be sure to fill the buffers in questions with zeros, and schedule another clear/fill to zero operation at the end of each renderpass. I do have other ideas, however: like potentially making the tags field cause the execution of a secondary script, which can be used to modify the resource as appropriate to include the appropriate fields (maybe by potentially reaching in and directly mutating a `VkBufferCreateInfo`?). Unfortunately, I haven't yet had time to further explore this idea. The farther I got was using the tags field to call a `std::function` object that was stored in a `std::unordered_map<std::string, std::function<void(st::ShaderResource*)>>` (thus used to mutate the passed resource): this accomplishes the same end result, but still is less data-driven than I would prefer since the functions we call are compiled code.
+In this way, we can attach further metadata and then evolve unique behaviors based on that data without having to modify the backend library doing all this parsing. The above probably isn't the most ideal case and this probably is not the best or most performant way to handle this, but I didn't feel like it was wise to start modifying ShaderTools deeply to accomodate the premise of these tags. So in the end I think I leaving it to the user to do things like the above makes the most sense. In the case of the other tags, like the one attached to the `ClusteredForward` group, we would make note of this (on the rendegraph or client level, of course) and then be sure to fill the buffers in questions with zeros, and schedule another clear/fill to zero operation at the end of each renderpass. I do have other ideas, however: like potentially making the tags field cause the execution of a secondary script, which can be used to modify the resource as appropriate to include the appropriate fields (maybe by potentially reaching in and directly mutating a `VkBufferCreateInfo`?). Unfortunately, I haven't yet had time to further explore this idea. The farther I got was using the tags field to call a `std::function` object that was stored in a `std::unordered_map<std::string, std::function<void(st::ShaderResource*)>>`: this accomplishes the same end result, but is still less-than-ideal of course as the code for modifying these resources is still compiled-in (for now).
 
 #### Handling Structured Buffers
 
-The `UBO` structure in the above snippet of the shader resource script probably looked a little weird: first I had the buffers member name, and then the field was another Lua table containing a type string and an index. This combo looks messy, but the index is unfortunately required: Lua uses unordered tables, so the order of the members may otherwise end up scrambled and confused. 
+The `UBO` structure in the above snippet of the shader resource script probably looked a little weird: first I had the buffers member name, and then the field was another Lua table containing a type string and an index. This combo looks messy, but the index is unfortunately required: Lua uses unordered tables, so the order of the members may otherwise end up scrambled and confused. This took me some time to even realize, however, as it wasn't until I compared a shader before and after processing that I even noticed the order of the members had changed.
 
-### Automating Resource Creation and Population (Sometimes!)
+Object sizes are read from a table mapping the object's type string to a size value - there exist a large quantity of default sizes baked into the ShaderTools backend, but a user can actually freely add more sizes by declaring a new `ObjectSizes` table. The key is the object's type string, then, and the value is just the size. This table is then appended to the pre-existing table in ShaderTools.
 
 ### Extracting Even More Metadata
+
+As mentioned earlier, part of my goal in getting this system to work was so that I could use it to assist rendergraph construction. Now tha we can create the backing resources attached to shaders, we need to figure out how much data we can extract about the usage of resources by each individual shader (and sometimes, shader stages). The biggest thing we want to identify is if a resource is `readonly` or `writeonly` - which becomes rather hard to identify. At first, I thought this qualifier was being explicitly applied to a resource if it was at all able to: in GLSL recompiled from SPIR-V assembly the `readonly`/`writeonly` qualifiers were being applied to resources. But upon reading the `.spvasm` files myself, I couldn't find these qualifiers anywhere - and reading the SPIR-V spec revealed that this qualifier is only available when applied to images (and seemingly, not even texel buffers).
+
+{% highlight text %}
+OpDecorate %positionRanges DescriptorSet 1
+OpDecorate %positionRanges Binding 1
+OpDecorate %positionRanges Restrict
+OpDecorate %lightBounds DescriptorSet 2
+OpDecorate %lightBounds Binding 1
+OpDecorate %lightBounds Restrict
+OpDecorate %Flags DescriptorSet 2
+OpDecorate %Flags Binding 2
+OpDecorate %Flags Restrict
+{% endhighlight %}
+
+The only qualifier I could see - shown above in a snippet of SPIR-V assembly - was the "restrict" one that I was specifying be applied myself in the resource scripts. So how was the recompiler, when compiling back into GLSL, able to decide to apply these qualifiers? I created an issue in the `spirv-cross` repo, but diving further into the source code, learning more about SPIR-V, and a clarifying answer by 
 
 ##### Getting Strings Across A DLL Boundary
 
@@ -315,11 +331,19 @@ dll_retrieved_strings_t ShaderPack::GetShaderGroupNames() const {
 }
 {% endhighlight %}
 
-In case you were unaware, `strdrup` copies the strings and requires eventually calling `free` on the destination string pointers. I didn't want to enforce users to have to remember this step though, so by making the destructor of the `dll_retrieved_strings_t` structure call this (along with deleting it's copy constructor + assignment operator) we can effectively avoid leaking memory when passing these strings around. The easiest way to use it is by declaring a new scope with brackets (`{}`), copying the strings into local storage, then exiting the brackets and letting the retrieved strings be cleaned up. It's an idea I got again from `std::lock_guard`, and it works splendidly! And in case you can't tell, I'm fairly proud of my clever little trick :)
+In case you were unaware, `strdrup` copies the strings and requires eventually calling `free` on the destination string pointers. I didn't want to enforce users to have to remember this step though, so by making the destructor of the `dll_retrieved_strings_t` structure call this (along with deleting it's copy constructor + assignment operator) we can effectively avoid leaking memory when passing these strings around. The easiest way to use it is by declaring a new scope with brackets, copying the strings into local storage, then exiting the brackets and letting the retrieved strings be cleaned up. It's an idea I got again from `std::lock_guard`, and it works splendidly! And in case you can't tell, I'm fairly proud of my clever little trick :)
 
 ## ShaderPacks, Shaders, and ShaderStages
 
-Now with a full-featured resource system that allows for fully automated 
+Now with a full-featured resource system that allows for fully automated resource construction (in some cases), and that allows for our rendergraph to extract as much precious information as it can, it's time to move on to more of our higher-level design. This was an area I've struggled in, and I was only vaguely relieved to find a few other articles describing similar problems.
+
+For one, naming our objects in an efficient way becomes difficult. What is a "Shader"? Is it a single pack of shader code representing a stage in the programmable graphics pipeline? Or is it the combined programmable shader stage source code snippets required for a whole pipeline? What do we call the combined set of resources, shader source code snippets / stages, and so on? For my project, after a bunch of iteration I settled on the following:
+
+- ShaderStage describes a single stage of execution in the programmable graphics pipeline, and is our smallest distinct object
+- A Shader is a combination of ShaderStages that will eventually be used by a single graphics pipeline
+- A ShaderPack is a combination of Shaders, along with a resource script
+
+#### Designing an Efficient Interface
 
 #### Creating Descriptor Pools
 
@@ -327,12 +351,16 @@ Now with a full-featured resource system that allows for fully automated
 
 ## Potential Improvements 
 
+I've had a whole host of improvements in mind for ages now - and in many ways, ShaderTools' current status is a result of me actually implementing many of my ideas for improvements. If I was going to make a 2.0 version of this library, I'd probably use a more Unity-like system and implement abstract shaders with getters and setters and the like that are far removed from writing conventional GLSL: it opens up lots of chances for us to work some magic from the backend, ultimately. These ideas however are improvements I could be making to the *current* version of ShaderTools, however:
+
 - Something I really need to do: **resources with same names may not actually be equivalent and shouldn't have their representations merged together**
-- Better handling of vertex interfaces and inter-stage interfaces
+- **Figure out how to handle textures.** Using ShaderTools to create these backing resources is a moot point, as we'll likely be swapping what textures are bound where fairly frequently
+- Better handling of vertex interfaces and inter-stage interfaces for vertex attributes
 - Implement tags being used to execute further scripts and mutate resources
 - Improved Lua integration: fairly "singleton"-esque right now, can get weird if client is using Lua too
-- Move specialization constants to Lua system as well
+- **Move specialization constants to Lua system as well**
 - Profiling! Need to test using this live to build a bunch of shaders so I can get some good performance data from it so as to direct my optimizations
 - Run a multithreaded compile step for shader groups, since compiling with optimizations is rather expensive
 - Implement caching, by loading files back up from a specified directory (or the temporary file dump directory we use now)
-- Shader permutations! and actually enabling/using vendor extensions as appropriate. This moves to a higher-level system though, which might compromise my original vision for this project
+- Shader permutations! and actually enabling/using vendor extensions as appropriate. This falls more in line with my idea of a "ShaderTools 2.0", however
+- Potentially build a C# GUI/interface over this library to make interacting and using it far easier, and so I can finally learn C#
