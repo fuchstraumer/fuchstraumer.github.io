@@ -339,7 +339,8 @@ I chose to instead call this *before* parsing further metadata however, so that 
 {% highlight cpp %}
 // If following logic fails, we just use read-write as it's a perfectly fine fallback
 access_modifier modifier(access_modifier::ReadWrite);
-if (type_being_parsed == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || type_being_parsed == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) {
+if (type_being_parsed == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+    type_being_parsed == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) {
     modifier = access_modifier::Read;
 }
 // "rsrc" is just a spirv_cross::Resource value
