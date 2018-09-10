@@ -276,6 +276,30 @@ The `UBO` structure in the above snippet of the shader resource script probably 
 
 Object sizes are read from a table mapping the object's type string to a size value - there exist a large quantity of default sizes baked into the ShaderTools backend, but a user can actually freely add more sizes by declaring a new `ObjectSizes` table. The key is the object's type string, then, and the value is just the size. This table is then appended to the pre-existing table in ShaderTools.
 
+#### Textures?
+
+Handling textures is a tough one - by textures, I'm referring to images we explicitly expect to load data for from a file, and that will be used when shading a primitive. We obviously will want to declare the binding locations of these objects ahead of time, but we won't be able to do anything more for them: format is unknown, size is unknown, and the backing data is unknown as well. To make it more complex, we also can't really assume that a single file will ever be enough for a texture "slot". It's likely that we will be changing out what the backing data in a texture slot is at runtime, as we change primitives and bind different descriptor sets. For that reason, I added a `FromFile` field. When specified as true, the parsing of further metadata is skipped - so there is no way to retrieve `VkImageCreateInfo`/`VkImageViewCreateInfo` for textures created in this manner. It's imperfect, but it's the best I could think of doing without specifying what our material system will look like at the level of this library (which I'd rather not do, as it makes it considerably less general-use). Thus, a texture field looks a bit like so:
+
+{% highlight lua %}
+Resources = {
+    MaterialTextures = {
+        diffuseMap = {
+            Type = "CombinedImageSampler",
+            FromFile = true
+        },
+        normalMap = {
+            Type = "CombinedImageSampler",
+            FromFile = true
+        },
+        roughnessMap = {
+            Type = "CombinedImageSampler",
+            FromFile = true
+        }
+        -- And so on...
+    }
+}
+{% endhighlight %}
+
 ### Extracting Even More Metadata
 
 As mentioned earlier, part of my goal in getting this system to work was so that I could use it to assist rendergraph construction. Now tha we can create the backing resources attached to shaders, we need to figure out how much data we can extract about the usage of resources by each individual shader (and sometimes, shader stages). The biggest thing we want to identify is if a resource is `readonly` or `writeonly` - which becomes rather hard to identify. At first, I thought this qualifier was being explicitly applied to a resource if it was at all able to: in GLSL recompiled from SPIR-V assembly the `readonly`/`writeonly` qualifiers were being applied to resources. But upon reading the `.spvasm` files myself, I couldn't find these qualifiers anywhere - and reading the SPIR-V spec revealed that this qualifier is only available when applied to images (and seemingly, not even texel buffers).
