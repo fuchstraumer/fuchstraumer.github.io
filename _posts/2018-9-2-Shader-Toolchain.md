@@ -334,48 +334,24 @@ Okay, so we can now store per-use qualifier information, along with being able t
 
 Previously, I was just passing a binary blob to the `spirv-cross` recompiler. This (as far as I know) simply causes the binary to be parsed for the basic reflection information we have been retrieving thus far. But it won't give us read/write information: this is applied during the `compile()` call, when the SPIR-V is used to reconstruct the source GLSL. Previously I had avoided calling this, as it seemed like a potentially expensive step and was only really useful for potentially debugging issues or for viewing the recompiled GLSL out of curiosity.
 
-I chose to instead call this *before* parsing further metadata however, so that we could hopefully really simply get our read/write qualifiers. But again, it was not quite that simple. First, some resource/descriptor types can't have qualifiers applied to them - or implicitly are `readonly` (e.g, most uniform types). In the cases of R/W buffers, the qualifier was stored in a different way from R/W images: so I had to change my retrieval and parsing strategy based on the high-level type of the resource, and based on the more granular subtype within that. The resulting code isn't exactly pretty:
+I chose to instead call this *before* parsing further metadata however, so that we could hopefully really simply get our read/write qualifiers. Turns out, that solves the problem most of the time and getting our qualifiers is as simple as this:
 
 {% highlight cpp %}
-// access_modifier being an internal enum
-access_modifier AccessModifierFromSPIRType(const spirv_cross::SPIRType & type) {
-    using namespace spirv_cross;
-    auto handle_indeterminate_case = [&]() {
-        // Usually happens for storage images.
-        if (type.basetype == SPIRType::Image && type.image.dim == spv::Dim::DimBuffer) {
-            return access_modifier::ReadWrite;
-        }
-        else if (type.storage != spv::StorageClass::StorageClassMax) {
-            return accessModifierFromStorageClass(type.storage);
-        }
-        else {
-            throw std::domain_error("Couldn't parse objects access modifier.");
-        }
-    };
-
-    if (type.basetype == SPIRType::SampledImage || type.basetype == SPIRType::Sampler ||
-        type.basetype == SPIRType::Struct || type.basetype == SPIRType::AtomicCounter) {
-        return access_modifier::Read;
-    }
-    else {
-        switch (type.image.access) {
-        case spv::AccessQualifier::AccessQualifierReadOnly:
-            return access_modifier::Read;
-        case spv::AccessQualifier::AccessQualifierWriteOnly:
-            return access_modifier::Write;
-        case spv::AccessQualifier::AccessQualifierReadWrite:
-            return access_modifier::ReadWrite;
-        case spv::AccessQualifier::AccessQualifierMax:
-            return handle_indeterminate_case();
-        default:
-            LOG(ERROR) << "SPIRType somehow has invalid access qualifier enum value!";
-            throw std::domain_error("SPIRType somehow has invalid access qualifier enum value!");
-        }
-    }
+// If following logic fails, we just use read-write as it's a perfectly fine fallback
+access_modifier modifier(access_modifier::ReadWrite);
+if (type_being_parsed == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || type_being_parsed == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) {
+    modifier = access_modifier::Read;
+}
+// "rsrc" is just a spirv_cross::Resource value
+else if (recompiler->has_decoration(rsrc.id, spv::DecorationNonWritable)) {
+    modifier = access_modifier::Read;
+}
+else if (recompiler->has_decoration(rsrc.id, spv::DecorationNonReadable)) {
+    modifier = access_modifier::Write;
 }
 {% endhighlight %}
 
-First, we try to use the resources base type to eliminate any read-only resources from being further processed. Second, I mentioned earlier that SPIR-V only really is able to process access qualifiers for image types: this is stored in the SPIR-V though, and doesn't require `spirv_cross`s `compile()` to find. It should be applied by the shader compiler we use (in my case, `glslang`), and thus ends up in our result binary. `handle_indeterminate_case()` came about during testing, as it turns out that *even after reprocessing the qualifiers are not explicitly stored*. Instead, diving into the source code revealed that they are applied to the output GLSL by reading from the attributes like we do here.
+Previously, I would extract the type for a given `spirv_cross::Resource`, then try to use that type information to back out what I could about the resources access qualifiers. This sometimes worked, but it resulted in extremely messy code and just usually returned what we would already expect - plus, it only really worked on *types*. Not the instances of variables themselves, which is itself a problem. Using the logic above is simpler, cleaner, and so long as we remember to call `compile()` before trying to extract it - it ends up being spot-on accurate.
 
 ## ShaderPacks, Shaders, and ShaderStages
 
