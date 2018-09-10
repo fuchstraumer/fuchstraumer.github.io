@@ -48,7 +48,7 @@ layout (set = 3, binding = 4) uniform sampler2D diffuseMap;
 This is extremely gross. We don't want to write this, and we're (assumedly) people who are fairly used to writing shaders at a lower-level like this. This is *absolutely* not the kind of interface we want to begin exposing to artists and effects designers, and is not the sort of detail we want to them worrying about anyways. And it gets worse: since Vulkan uses so much just *more* information and data about it's resources and where they're bound, we have to do things like the following when creating the API objects that correspond to shader resource bindings:
 
 {% highlight cpp %}
-// texelBuffersLayout is a vpr::DescriptorSetLayout, used to describe the layout of a single 
+// texelBuffersLayout is a vpr::DescriptorSetLayout, used to describe the layout of a single
 // descriptor set's resources. This layout is for the "ClusteredForward" resource block.
 constexpr static VkShaderStageFlags fc_flags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
 texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, fc_flags, 0);
@@ -61,13 +61,13 @@ texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER
 texelBuffersLayout->Create();
 {% endhighlight %}
 
-And the gift keeps giving: Vulkan descriptor sets are allocated from `VkDescriptorPool`s. Creating these pools effectively requires forecasting, ahead of time, how many of each of the Vulkan `VK_DESCRIPTOR_TYPE_` resources you plan to use: if you try to allocate for 12 texel buffers, but you only specified room for 6, the API will throw errors and things will break really quick. And what if you change some of the bindings around? The above code has bindings 0-6 for texel buffers - but if we modify the shader to add a uniform buffer at binding 0, we have to make sure our code reflects that (both by changing the above bindings, and making sure our `VkDescriptorPool` has room). It's a lot of work to manage, and it's just not easy to keep sane with all this going on. 
+And the gift keeps giving: Vulkan descriptor sets are allocated from `VkDescriptorPool`s. Creating these pools effectively requires forecasting, ahead of time, how many of each of the Vulkan `VK_DESCRIPTOR_TYPE_` resources you plan to use: if you try to allocate for 12 texel buffers, but you only specified room for 6, the API will throw errors and things will break really quick. And what if you change some of the bindings around? The above code has bindings 0-6 for texel buffers - but if we modify the shader to add a uniform buffer at binding 0, we have to make sure our code reflects that (both by changing the above bindings, and making sure our `VkDescriptorPool` has room). It's a lot of work to manage, and it's just not easy to keep sane with all this going on.
 
-So these issues motivated the initial work into ShaderTools: let's take our pre-existing shaders, and just reflect back upon them to generate all this binding metadata at runtime (as no such mechanism exists in Vulkan, like it did in OpenGL). 
+So these issues motivated the initial work into ShaderTools: let's take our pre-existing shaders, and just reflect back upon them to generate all this binding metadata at runtime (as no such mechanism exists in Vulkan, like it did in OpenGL).
 
 ## Shader Reflection - the Beginnings
 
-If one wants to perform reflection on SPIR-V shaders, you're going to have to use the [spirv-cross](https://github.com/KhronosGroup/SPIRV-Cross) library. By feeding it a SPIR-V binary blob, one can query the library and get access to *all* of the resources used by a shader. From here, it's only a matter of collating this data across multiple stages (usually just vertex + fragment) and generating the relevant data: in initial versions of my library, the literally meant just generating the arrays of `VkDescriptorSetLayoutBinding`s one would require for a given combination of shaders. 
+If one wants to perform reflection on SPIR-V shaders, you're going to have to use the [spirv-cross](https://github.com/KhronosGroup/SPIRV-Cross) library. By feeding it a SPIR-V binary blob, one can query the library and get access to *all* of the resources used by a shader. From here, it's only a matter of collating this data across multiple stages (usually just vertex + fragment) and generating the relevant data: in initial versions of my library, the literally meant just generating the arrays of `VkDescriptorSetLayoutBinding`s one would require for a given combination of shaders.
 
 {% highlight cpp %}
 const size_t num_descriptor_sets = reflectionSystem->GetNumDescriptorSets();
@@ -103,7 +103,7 @@ So, my goal became generating just the resource declarations per-shader: users w
 
 I'm going to skip over detailing how I implemented `#include` support - it's nothing too shocking to anyone who's been doing development work for a while, so I'll just skip right into something more interesting. Vulkan has these interesting objects called "specialization constants" - constant values in the shader that are bound to specified locations, a bit like descriptor resources. What makes them unique, however, is that the value can be modified at pipeline creation time. This is fairly powerful, as it lets you write one shader then potentially vary the behavior shortly before you use it: potentially allowing for the "generation" of shader permutations and variations at runtime. I personally tend to use it for holding values like the screen size, and other environmental constants that don't frequently change: when they do change (e.g, during a swapchain recreation event) we would have to recreate our pipelines anyways - allowing us to update the value to reflect the new screen size, for example.
 
-However, it can be a bit annoying and tedious to type out `layout (constant_id = (idx))` for each of the specialization constants we intend to use. Additionally, I figured (correctly!) that practicing on this feature would help me prepare for the more difficult world of descriptors and those resources. Currently, one declares a specialization constant quite simply: `SPC (TYPE) (NAME) = (VALUE)` will do the trick. From there, the shader generation system adds the requisite `layout (constant_id = (idx))` prefix as appropriate, keeping a running tally of the current index to use per-shader. 
+However, it can be a bit annoying and tedious to type out `layout (constant_id = (idx))` for each of the specialization constants we intend to use. Additionally, I figured (correctly!) that practicing on this feature would help me prepare for the more difficult world of descriptors and those resources. Currently, one declares a specialization constant quite simply: `SPC (TYPE) (NAME) = (VALUE)` will do the trick. From there, the shader generation system adds the requisite `layout (constant_id = (idx))` prefix as appropriate, keeping a running tally of the current index to use per-shader.
 
 #### Simplifying Resources With Resource Groups
 
@@ -263,7 +263,7 @@ void BufferResourceCache::createBuffer(const st::ShaderResource* rsrc) {
     }
 
     // should be using a view_info param here but skipped for brevity
-    VulkanResource* new_buffer = resourcePluginAPI->CreateBuffer(&create_info, nullptr, 
+    VulkanResource* new_buffer = resourcePluginAPI->CreateBuffer(&create_info, nullptr,
         0, nullptr, memory_type::DEVICE_LOCAL, nullptr);
 }
 {% endhighlight %}
@@ -373,7 +373,7 @@ For one, naming our objects in an efficient way becomes difficult. What is a "Sh
 
 
 
-## Potential Improvements 
+## Potential Improvements
 
 I've had a whole host of improvements in mind for ages now - and in many ways, ShaderTools' current status is a result of me actually implementing many of my ideas for improvements. If I was going to make a 2.0 version of this library, I'd probably use a more Unity-like system and implement abstract shaders with getters and setters and the like that are far removed from writing conventional GLSL: it opens up lots of chances for us to work some magic from the backend, ultimately. These ideas however are improvements I could be making to the *current* version of ShaderTools, however:
 
