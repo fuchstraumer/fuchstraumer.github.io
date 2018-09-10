@@ -316,11 +316,21 @@ OpDecorate %Flags Binding 2
 OpDecorate %Flags Restrict
 {% endhighlight %}
 
-The only qualifier I could see - shown above in a snippet of SPIR-V assembly - was the "restrict" one that I was specifying be applied myself in the resource scripts. So how was the recompiler, when compiling back into GLSL, able to decide to apply these qualifiers? I created an issue in the `spirv-cross` repo, but diving further into the source code, learning more about SPIR-V, and a clarifying answer by 
+The only qualifier I could see - shown above in a snippet of SPIR-V assembly - was the "restrict" one that I was specifying be applied myself in the resource scripts. So how was the recompiler, when compiling back into GLSL, able to decide to apply these qualifiers? I created an issue in the `spirv-cross` repo, but diving further into the source code, learning more about SPIR-V, and [a clarifying answer by Hans](https://github.com/KhronosGroup/SPIRV-Cross/issues/606) (again, he is too good and I appreciate his work on `spirv-cross` immensely) revealed that SPIR-V doesn't store this information, conventionally. Indeed, our best bet is to make sure we use the right qualifiers from the get-go.
+
+#### Access Modifiers/Qualifiers
+
+So, we know two things: retrieving the access qualifiers from the SPIR-V isn't strictly possible, and setting the qualifiers initially is our best. The second point is why I added the `Qualifiers` field to the resource scripts: you'll notice nearly every resource uses `restrict`, which is a qualifier that you should (by the recommendation of numerous Khronos documents) use as often as possible. In other locations, I was able to specify things like `readonly` however.
+
+At first, I thought I could then simply store these qualifiers in the shader resource meta-object used to associate metadata to a resource. But this really won't work: these access qualifiers may change in different shaders, and while we're able to specify some as invariant across multiple shader stages / pipelines this is not usually the case. So I had to rethink things.
+
+#### Separating Resources From Their Usage
+
+This conflict resulted in the creation of a `ResourceUsage` ([here](https://github.com/fuchstraumer/ShaderTools/blob/cd5910cb594fc6c1818eb09da9d0a3d194242d95/include/core/ResourceUsage.hpp)) object: `ShaderResource` ([here](https://github.com/fuchstraumer/ShaderTools/blob/cd5910cb594fc6c1818eb09da9d0a3d194242d95/include/core/ShaderResource.hpp)) represents a singular resource itself, but a `ResourceUsage` is a child object representing a singular use of the resource in a particular shader. We then store our access qualifiers in the resource usage, not the parent resource. This way, our rendergraph is able to also exploit this split in logic: it can see a resource is used multiple times, and by analyzing the qualifiers on it's various usages it is able to schedule passes, insert memory barriers, and ensure safe access/use of a resource.
 
 ##### Getting Strings Across A DLL Boundary
 
-I didn't explicitly note it earlier, but due to the large amount of dependencies ShaderTools requires I was rather determined to make this project work as a DLL/shared library - so that clients wouldn't have to also link to our huge pile of dependencies. This creates some restrictions though: for example, as I noted above we often want to retrieve the names of our resources and even the resource group they're in as strings. But how do we pass or retrieve strings across a DLL boundary? Just writing to an array of `const char*` pointers can be dangerous and expensive, as then we have to 
+I didn't explicitly note it earlier, but due to the large amount of dependencies ShaderTools requires I was rather determined to make this project work as a DLL/shared library - so that clients wouldn't have to also link to our huge pile of dependencies. This creates some restrictions though: for example, as I noted above we often want to retrieve the names of our resources and even the resource group they're in as strings. But how do we pass or retrieve strings across a DLL boundary? Just writing to an array of `const char*` pointers can be dangerous and expensive, as then we have to
 
 - make sure the pointers remain valid by storing copies of the strings somewhere
 - potentially copy what would've been temporary data into more permanent storagea
