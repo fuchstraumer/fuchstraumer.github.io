@@ -302,7 +302,7 @@ Resources = {
 
 ### Extracting Even More Metadata
 
-As mentioned earlier, part of my goal in getting this system to work was so that I could use it to assist rendergraph construction. Now tha we can create the backing resources attached to shaders, we need to figure out how much data we can extract about the usage of resources by each individual shader (and sometimes, shader stages). The biggest thing we want to identify is if a resource is `readonly` or `writeonly` - which becomes rather hard to identify. At first, I thought this qualifier was being explicitly applied to a resource if it was at all able to: in GLSL recompiled from SPIR-V assembly the `readonly`/`writeonly` qualifiers were being applied to resources. But upon reading the `.spvasm` files myself, I couldn't find these qualifiers anywhere - and reading the SPIR-V spec revealed that this qualifier is only available when applied to images (and seemingly, not even texel buffers).
+As mentioned earlier, part of my goal in getting this system to work was so that I could use it to assist rendergraph construction. Now that we can create the backing resources attached to shaders, we need to figure out how much data we can extract about the usage of resources by each individual shader (and sometimes, shader stages). The biggest thing we want to identify is if a resource is `readonly` or `writeonly` - which becomes rather hard to identify. At first, I thought this qualifier was being explicitly applied to a resource if it was at all able to: in GLSL recompiled from SPIR-V assembly the `readonly`/`writeonly` qualifiers were being applied to resources. But upon reading the `.spvasm` files myself, I couldn't find these qualifiers anywhere - and reading the SPIR-V spec revealed that this qualifier is only available when applied to images (and seemingly, not even texel buffers).
 
 {% highlight text %}
 OpDecorate %positionRanges DescriptorSet 1
@@ -320,11 +320,76 @@ The only qualifier I could see - shown above in a snippet of SPIR-V assembly - w
 
 #### Memory Modifiers/Qualifiers
 
-So, we know two things: retrieving the Memory (or, access) qualifiers from the SPIR-V isn't strictly possible, and setting the qualifiers initially is our best. The second point is why I added the `Qualifiers` field to the resource scripts: you'll notice nearly every resource uses `restrict`, which is a qualifier that you should (by the recommendation of numerous Khronos documents) use as often as possible. In other locations, I was able to specify things like `readonly` however.
+So, we know two things: retrieving the Memory (or, access) qualifiers from the SPIR-V isn't strictly possible, and setting the qualifiers initially is our best. The second point is why I added the `Qualifiers` field to the resource scripts: you'll notice nearly every resource uses `restrict`, which is a qualifier that you should (by the recommendation of numerous Khronos documents) use as often as possible. In an instance or two, I have been able to specify things like `readonly` ahead of time - but this is fairly rare, and it can be hard to figure this out yourself.
 
 At first, I thought I could then simply store these qualifiers in the shader resource meta-object used to associate metadata to a resource. But this really won't work: these access qualifiers may change in different shaders, and while we're able to specify some as invariant across multiple shader stages / pipelines this is not usually the case. So I had to rethink things.
 
 Clearly, we needed to separate the abstraction representing a shader resource from it's _usage_. There is a clear separation here, and it's something we'll now need - we'll be using all of our resources multiple times, and each time we may have different qualifiers on it. This resulted in the creation of a `ResourceUsage` ([here](https://github.com/fuchstraumer/ShaderTools/blob/cd5910cb594fc6c1818eb09da9d0a3d194242d95/include/core/ResourceUsage.hpp)) object: `ShaderResource` ([here](https://github.com/fuchstraumer/ShaderTools/blob/cd5910cb594fc6c1818eb09da9d0a3d194242d95/include/core/ShaderResource.hpp)) represents a singular resource itself, but a `ResourceUsage` is a child object representing a singular use of the resource in a particular shader. We then store our access qualifiers in the resource usage, not the parent resource. This way, our rendergraph is able to also exploit this split in logic: it can see a resource is used multiple times, and by analyzing the qualifiers on it's various usages it is able to schedule passes, insert memory barriers, and ensure safe access/use of a resource.
+
+#### Extracting The Qualifiers
+
+Okay, so we can now store per-use qualifier information, along with being able to specify qualifiers to apply across all uses. But how do we extract the qualifiers from `spirv-cross`, so we can accurately update cases where a resource may be `readonly`/`writeonly`? A key note in the earlier issue was:
+
+> When you call compile, it will internally modify readonly/writeonly flags based on usage, so this behavior is expected, albeit a bit awkward.
+
+Previously, I was just passing a binary blob to the `spirv-cross` recompiler. This (as far as I know) simply causes the binary to be parsed for the basic reflection information we have been retrieving thus far. But it won't give us read/write information: this is applied during the `compile()` call, when the SPIR-V is used to reconstruct the source GLSL. Previously I had avoided calling this, as it seemed like a potentially expensive step and was only really useful for potentially debugging issues or for viewing the recompiled GLSL out of curiosity.
+
+I chose to instead call this *before* parsing further metadata however, so that we could hopefully really simply get our read/write qualifiers. But again, it was not quite that simple. First, some resource/descriptor types can't have qualifiers applied to them - or implicitly are `readonly` (e.g, most uniform types). In the cases of R/W buffers, the qualifier was stored in a different way from R/W images: so I had to change my retrieval and parsing strategy based on the high-level type of the resource, and based on the more granular subtype within that. The resulting code isn't exactly pretty:
+
+{% highlight cpp %}
+// access_modifier being an internal enum
+access_modifier AccessModifierFromSPIRType(const spirv_cross::SPIRType & type) {
+    using namespace spirv_cross;
+    auto handle_indeterminate_case = [&]() {
+        // Usually happens for storage images.
+        if (type.basetype == SPIRType::Image && type.image.dim == spv::Dim::DimBuffer) {
+            return access_modifier::ReadWrite;
+        }
+        else if (type.storage != spv::StorageClass::StorageClassMax) {
+            return accessModifierFromStorageClass(type.storage);
+        }
+        else {
+            throw std::domain_error("Couldn't parse objects access modifier.");
+        }
+    };
+
+    if (type.basetype == SPIRType::SampledImage || type.basetype == SPIRType::Sampler ||
+        type.basetype == SPIRType::Struct || type.basetype == SPIRType::AtomicCounter) {
+        return access_modifier::Read;
+    }
+    else {
+        switch (type.image.access) {
+        case spv::AccessQualifier::AccessQualifierReadOnly:
+            return access_modifier::Read;
+        case spv::AccessQualifier::AccessQualifierWriteOnly:
+            return access_modifier::Write;
+        case spv::AccessQualifier::AccessQualifierReadWrite:
+            return access_modifier::ReadWrite;
+        case spv::AccessQualifier::AccessQualifierMax:
+            return handle_indeterminate_case();
+        default:
+            LOG(ERROR) << "SPIRType somehow has invalid access qualifier enum value!";
+            throw std::domain_error("SPIRType somehow has invalid access qualifier enum value!");
+        }
+    }
+}
+{% endhighlight %}
+
+First, we try to use the resources base type to eliminate any read-only resources from being further processed. Second, I mentioned earlier that SPIR-V only really is able to process access qualifiers for image types: this is stored in the SPIR-V though, and doesn't require `spirv_cross`s `compile()` to find. It should be applied by the shader compiler we use (in my case, `glslang`), and thus ends up in our result binary. `handle_indeterminate_case()` came about during testing, as it turns out that *even after reprocessing the qualifiers are not explicitly stored*. Instead, diving into the source code revealed that they are applied to the output GLSL by reading from the attributes like we do here.
+
+## ShaderPacks, Shaders, and ShaderStages
+
+Now with a full-featured resource system that allows for fully automated resource construction (in some cases), and that allows for our rendergraph to extract as much precious information as it can, it's time to move on to more of our higher-level design. This was an area I've struggled in, and I was only vaguely relieved to find a few other articles describing similar problems.
+
+For one, naming our objects in an efficient way becomes difficult. What is a "Shader"? Is it a single pack of shader code representing a stage in the programmable graphics pipeline? Or is it the combined programmable shader stage source code snippets required for a whole pipeline? What do we call the combined set of resources, shader source code snippets / stages, and so on? For my project, after a bunch of iteration I settled on the following:
+
+- ShaderStage describes a single stage of execution in the programmable graphics pipeline, and is our smallest distinct object
+- A Shader is a combination of ShaderStages that will eventually be used by a single graphics pipeline
+- A ShaderPack is a combination of Shaders, along with a resource script
+
+#### Designing an Efficient Interface
+
+#### Creating Descriptor Pools
 
 ##### Getting Strings Across A DLL Boundary
 
@@ -364,22 +429,6 @@ dll_retrieved_strings_t ShaderPack::GetShaderGroupNames() const {
 {% endhighlight %}
 
 In case you were unaware, `strdrup` copies the strings and requires eventually calling `free` on the destination string pointers. I didn't want to enforce users to have to remember this step though, so by making the destructor of the `dll_retrieved_strings_t` structure call this (along with deleting it's copy constructor + assignment operator) we can effectively avoid leaking memory when passing these strings around. The easiest way to use it is by declaring a new scope with brackets, copying the strings into local storage, then exiting the brackets and letting the retrieved strings be cleaned up. It's an idea I got again from `std::lock_guard`, and it works splendidly! And in case you can't tell, I'm fairly proud of my clever little trick :)
-
-## ShaderPacks, Shaders, and ShaderStages
-
-Now with a full-featured resource system that allows for fully automated resource construction (in some cases), and that allows for our rendergraph to extract as much precious information as it can, it's time to move on to more of our higher-level design. This was an area I've struggled in, and I was only vaguely relieved to find a few other articles describing similar problems.
-
-For one, naming our objects in an efficient way becomes difficult. What is a "Shader"? Is it a single pack of shader code representing a stage in the programmable graphics pipeline? Or is it the combined programmable shader stage source code snippets required for a whole pipeline? What do we call the combined set of resources, shader source code snippets / stages, and so on? For my project, after a bunch of iteration I settled on the following:
-
-- ShaderStage describes a single stage of execution in the programmable graphics pipeline, and is our smallest distinct object
-- A Shader is a combination of ShaderStages that will eventually be used by a single graphics pipeline
-- A ShaderPack is a combination of Shaders, along with a resource script
-
-#### Designing an Efficient Interface
-
-#### Creating Descriptor Pools
-
-
 
 ## Potential Improvements
 
