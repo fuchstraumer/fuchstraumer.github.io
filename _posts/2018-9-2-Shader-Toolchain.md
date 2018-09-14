@@ -48,7 +48,7 @@ layout (set = 3, binding = 4) uniform sampler2D diffuseMap;
 This is extremely gross. We don't want to write this, and we're (assumedly) people who are fairly used to writing shaders at a lower-level like this. This is *absolutely* not the kind of interface we want to begin exposing to artists and effects designers, and is not the sort of detail we want to them worrying about anyways. And it gets worse: since Vulkan uses so much just *more* information and data about it's resources and where they're bound, we have to do things like the following when creating the API objects that correspond to shader resource bindings:
 
 {% highlight cpp %}
-// texelBuffersLayout is a vpr::DescriptorSetLayout, used to describe the layout of a single 
+// texelBuffersLayout is a vpr::DescriptorSetLayout, used to describe the layout of a single
 // descriptor set's resources. This layout is for the "ClusteredForward" resource block.
 constexpr static VkShaderStageFlags fc_flags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
 texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, fc_flags, 0);
@@ -61,13 +61,13 @@ texelBuffersLayout->AddDescriptorBinding(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER
 texelBuffersLayout->Create();
 {% endhighlight %}
 
-And the gift keeps giving: Vulkan descriptor sets are allocated from `VkDescriptorPool`s. Creating these pools effectively requires forecasting, ahead of time, how many of each of the Vulkan `VK_DESCRIPTOR_TYPE_` resources you plan to use: if you try to allocate for 12 texel buffers, but you only specified room for 6, the API will throw errors and things will break really quick. And what if you change some of the bindings around? The above code has bindings 0-6 for texel buffers - but if we modify the shader to add a uniform buffer at binding 0, we have to make sure our code reflects that (both by changing the above bindings, and making sure our `VkDescriptorPool` has room). It's a lot of work to manage, and it's just not easy to keep sane with all this going on. 
+And the gift keeps giving: Vulkan descriptor sets are allocated from `VkDescriptorPool`s. Creating these pools effectively requires forecasting, ahead of time, how many of each of the Vulkan `VK_DESCRIPTOR_TYPE_` resources you plan to use: if you try to allocate for 12 texel buffers, but you only specified room for 6, the API will throw errors and things will break really quick. And what if you change some of the bindings around? The above code has bindings 0-6 for texel buffers - but if we modify the shader to add a uniform buffer at binding 0, we have to make sure our code reflects that (both by changing the above bindings, and making sure our `VkDescriptorPool` has room). It's a lot of work to manage, and it's just not easy to keep sane with all this going on.
 
-So these issues motivated the initial work into ShaderTools: let's take our pre-existing shaders, and just reflect back upon them to generate all this binding metadata at runtime (as no such mechanism exists in Vulkan, like it did in OpenGL). 
+So these issues motivated the initial work into ShaderTools: let's take our pre-existing shaders, and just reflect back upon them to generate all this binding metadata at runtime (as no such mechanism exists in Vulkan, like it did in OpenGL).
 
 ## Shader Reflection - the Beginnings
 
-If one wants to perform reflection on SPIR-V shaders, you're going to have to use the [spirv-cross](https://github.com/KhronosGroup/SPIRV-Cross) library. By feeding it a SPIR-V binary blob, one can query the library and get access to *all* of the resources used by a shader. From here, it's only a matter of collating this data across multiple stages (usually just vertex + fragment) and generating the relevant data: in initial versions of my library, the literally meant just generating the arrays of `VkDescriptorSetLayoutBinding`s one would require for a given combination of shaders. 
+If one wants to perform reflection on SPIR-V shaders, you're going to have to use the [spirv-cross](https://github.com/KhronosGroup/SPIRV-Cross) library. By feeding it a SPIR-V binary blob, one can query the library and get access to *all* of the resources used by a shader. From here, it's only a matter of collating this data across multiple stages (usually just vertex + fragment) and generating the relevant data: in initial versions of my library, the literally meant just generating the arrays of `VkDescriptorSetLayoutBinding`s one would require for a given combination of shaders.
 
 {% highlight cpp %}
 const size_t num_descriptor_sets = reflectionSystem->GetNumDescriptorSets();
@@ -103,7 +103,7 @@ So, my goal became generating just the resource declarations per-shader: users w
 
 I'm going to skip over detailing how I implemented `#include` support - it's nothing too shocking to anyone who's been doing development work for a while, so I'll just skip right into something more interesting. Vulkan has these interesting objects called "specialization constants" - constant values in the shader that are bound to specified locations, a bit like descriptor resources. What makes them unique, however, is that the value can be modified at pipeline creation time. This is fairly powerful, as it lets you write one shader then potentially vary the behavior shortly before you use it: potentially allowing for the "generation" of shader permutations and variations at runtime. I personally tend to use it for holding values like the screen size, and other environmental constants that don't frequently change: when they do change (e.g, during a swapchain recreation event) we would have to recreate our pipelines anyways - allowing us to update the value to reflect the new screen size, for example.
 
-However, it can be a bit annoying and tedious to type out `layout (constant_id = (idx))` for each of the specialization constants we intend to use. Additionally, I figured (correctly!) that practicing on this feature would help me prepare for the more difficult world of descriptors and those resources. Currently, one declares a specialization constant quite simply: `SPC (TYPE) (NAME) = (VALUE)` will do the trick. From there, the shader generation system adds the requisite `layout (constant_id = (idx))` prefix as appropriate, keeping a running tally of the current index to use per-shader. 
+However, it can be a bit annoying and tedious to type out `layout (constant_id = (idx))` for each of the specialization constants we intend to use. Additionally, I figured (correctly!) that practicing on this feature would help me prepare for the more difficult world of descriptors and those resources. Currently, one declares a specialization constant quite simply: `SPC (TYPE) (NAME) = (VALUE)` will do the trick. From there, the shader generation system adds the requisite `layout (constant_id = (idx))` prefix as appropriate, keeping a running tally of the current index to use per-shader.
 
 #### Simplifying Resources With Resource Groups
 
@@ -263,7 +263,7 @@ void BufferResourceCache::createBuffer(const st::ShaderResource* rsrc) {
     }
 
     // should be using a view_info param here but skipped for brevity
-    VulkanResource* new_buffer = resourcePluginAPI->CreateBuffer(&create_info, nullptr, 
+    VulkanResource* new_buffer = resourcePluginAPI->CreateBuffer(&create_info, nullptr,
         0, nullptr, memory_type::DEVICE_LOCAL, nullptr);
 }
 {% endhighlight %}
@@ -276,9 +276,33 @@ The `UBO` structure in the above snippet of the shader resource script probably 
 
 Object sizes are read from a table mapping the object's type string to a size value - there exist a large quantity of default sizes baked into the ShaderTools backend, but a user can actually freely add more sizes by declaring a new `ObjectSizes` table. The key is the object's type string, then, and the value is just the size. This table is then appended to the pre-existing table in ShaderTools.
 
+#### Textures?
+
+Handling textures is a tough one - by textures, I'm referring to images we explicitly expect to load data for from a file, and that will be used when shading a primitive. We obviously will want to declare the binding locations of these objects ahead of time, but we won't be able to do anything more for them: format is unknown, size is unknown, and the backing data is unknown as well. To make it more complex, we also can't really assume that a single file will ever be enough for a texture "slot". It's likely that we will be changing out what the backing data in a texture slot is at runtime, as we change primitives and bind different descriptor sets. For that reason, I added a `FromFile` field. When specified as true, the parsing of further metadata is skipped - so there is no way to retrieve `VkImageCreateInfo`/`VkImageViewCreateInfo` for textures created in this manner. It's imperfect, but it's the best I could think of doing without specifying what our material system will look like at the level of this library (which I'd rather not do, as it makes it considerably less general-use). Thus, a texture field looks a bit like so:
+
+{% highlight lua %}
+Resources = {
+    MaterialTextures = {
+        diffuseMap = {
+            Type = "CombinedImageSampler",
+            FromFile = true
+        },
+        normalMap = {
+            Type = "CombinedImageSampler",
+            FromFile = true
+        },
+        roughnessMap = {
+            Type = "CombinedImageSampler",
+            FromFile = true
+        }
+        -- And so on...
+    }
+}
+{% endhighlight %}
+
 ### Extracting Even More Metadata
 
-As mentioned earlier, part of my goal in getting this system to work was so that I could use it to assist rendergraph construction. Now tha we can create the backing resources attached to shaders, we need to figure out how much data we can extract about the usage of resources by each individual shader (and sometimes, shader stages). The biggest thing we want to identify is if a resource is `readonly` or `writeonly` - which becomes rather hard to identify. At first, I thought this qualifier was being explicitly applied to a resource if it was at all able to: in GLSL recompiled from SPIR-V assembly the `readonly`/`writeonly` qualifiers were being applied to resources. But upon reading the `.spvasm` files myself, I couldn't find these qualifiers anywhere - and reading the SPIR-V spec revealed that this qualifier is only available when applied to images (and seemingly, not even texel buffers).
+As mentioned earlier, part of my goal in getting this system to work was so that I could use it to assist rendergraph construction. Now that we can create the backing resources attached to shaders, we need to figure out how much data we can extract about the usage of resources by each individual shader (and sometimes, shader stages). The biggest thing we want to identify is if a resource is `readonly` or `writeonly` - which becomes rather hard to identify. At first, I thought this qualifier was being explicitly applied to a resource if it was at all able to: in GLSL recompiled from SPIR-V assembly the `readonly`/`writeonly` qualifiers were being applied to resources. But upon reading the `.spvasm` files myself, I couldn't find these qualifiers anywhere - and reading the SPIR-V spec revealed that this qualifier is only available when applied to images (and seemingly, not even texel buffers).
 
 {% highlight text %}
 OpDecorate %positionRanges DescriptorSet 1
@@ -292,11 +316,61 @@ OpDecorate %Flags Binding 2
 OpDecorate %Flags Restrict
 {% endhighlight %}
 
-The only qualifier I could see - shown above in a snippet of SPIR-V assembly - was the "restrict" one that I was specifying be applied myself in the resource scripts. So how was the recompiler, when compiling back into GLSL, able to decide to apply these qualifiers? I created an issue in the `spirv-cross` repo, but diving further into the source code, learning more about SPIR-V, and a clarifying answer by 
+The only qualifier I could see - shown above in a snippet of SPIR-V assembly - was the "restrict" one that I was specifying be applied myself in the resource scripts. So how was the recompiler, when compiling back into GLSL, able to decide to apply these qualifiers? I created an issue in the `spirv-cross` repo, but diving further into the source code, learning more about SPIR-V, and [a clarifying answer by Hans](https://github.com/KhronosGroup/SPIRV-Cross/issues/606) (again, he is too good and I appreciate his work on `spirv-cross` immensely) revealed that SPIR-V doesn't store this information, conventionally. Indeed, our best bet is to make sure we use the right qualifiers from the get-go.
+
+#### Memory Modifiers/Qualifiers
+
+So, we know two things: retrieving the Memory (or, access) qualifiers from the SPIR-V isn't strictly possible, and setting the qualifiers initially is our best. The second point is why I added the `Qualifiers` field to the resource scripts: you'll notice nearly every resource uses `restrict`, which is a qualifier that you should (by the recommendation of numerous Khronos documents) use as often as possible. In an instance or two, I have been able to specify things like `readonly` ahead of time - but this is fairly rare, and it can be hard to figure this out yourself.
+
+At first, I thought I could then simply store these qualifiers in the shader resource meta-object used to associate metadata to a resource. But this really won't work: these access qualifiers may change in different shaders, and while we're able to specify some as invariant across multiple shader stages / pipelines this is not usually the case. So I had to rethink things.
+
+Clearly, we needed to separate the abstraction representing a shader resource from it's _usage_. There is a clear separation here, and it's something we'll now need - we'll be using all of our resources multiple times, and each time we may have different qualifiers on it. This resulted in the creation of a `ResourceUsage` ([here](https://github.com/fuchstraumer/ShaderTools/blob/cd5910cb594fc6c1818eb09da9d0a3d194242d95/include/core/ResourceUsage.hpp)) object: `ShaderResource` ([here](https://github.com/fuchstraumer/ShaderTools/blob/cd5910cb594fc6c1818eb09da9d0a3d194242d95/include/core/ShaderResource.hpp)) represents a singular resource itself, but a `ResourceUsage` is a child object representing a singular use of the resource in a particular shader. We then store our access qualifiers in the resource usage, not the parent resource. This way, our rendergraph is able to also exploit this split in logic: it can see a resource is used multiple times, and by analyzing the qualifiers on it's various usages it is able to schedule passes, insert memory barriers, and ensure safe access/use of a resource.
+
+#### Extracting The Qualifiers
+
+Okay, so we can now store per-use qualifier information, along with being able to specify qualifiers to apply across all uses. But how do we extract the qualifiers from `spirv-cross`, so we can accurately update cases where a resource may be `readonly`/`writeonly`? A key note in the earlier issue was:
+
+> When you call compile, it will internally modify readonly/writeonly flags based on usage, so this behavior is expected, albeit a bit awkward.
+
+Previously, I was just passing a binary blob to the `spirv-cross` recompiler. This (as far as I know) simply causes the binary to be parsed for the basic reflection information we have been retrieving thus far. But it won't give us read/write information: this is applied during the `compile()` call, when the SPIR-V is used to reconstruct the source GLSL. Previously I had avoided calling this, as it seemed like a potentially expensive step and was only really useful for potentially debugging issues or for viewing the recompiled GLSL out of curiosity.
+
+I chose to instead call this *before* parsing further metadata however, so that we could hopefully really simply get our read/write qualifiers. Turns out, that solves the problem most of the time and getting our qualifiers is as simple as this:
+
+{% highlight cpp %}
+// If following logic fails, we just use read-write as it's a perfectly fine fallback
+access_modifier modifier(access_modifier::ReadWrite);
+if (type_being_parsed == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+    type_being_parsed == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) {
+    modifier = access_modifier::Read;
+}
+// "rsrc" is just a spirv_cross::Resource value
+else if (recompiler->has_decoration(rsrc.id, spv::DecorationNonWritable)) {
+    modifier = access_modifier::Read;
+}
+else if (recompiler->has_decoration(rsrc.id, spv::DecorationNonReadable)) {
+    modifier = access_modifier::Write;
+}
+{% endhighlight %}
+
+Previously, I would extract the type for a given `spirv_cross::Resource`, then try to use that type information to back out what I could about the resources access qualifiers. This sometimes worked, but it resulted in extremely messy code and just usually returned what we would already expect - plus, it only really worked on *types*. Not the instances of variables themselves, which is itself a problem. Using the logic above is simpler, cleaner, and so long as we remember to call `compile()` before trying to extract it - it ends up being spot-on accurate.
+
+## ShaderPacks, Shaders, and ShaderStages
+
+Now with a full-featured resource system that allows for fully automated resource construction (in some cases), and that allows for our rendergraph to extract as much precious information as it can, it's time to move on to more of our higher-level design. This was an area I've struggled in, and I was only vaguely relieved to find a few other articles describing similar problems.
+
+For one, naming our objects in an efficient way becomes difficult. What is a "Shader"? Is it a single pack of shader code representing a stage in the programmable graphics pipeline? Or is it the combined programmable shader stage source code snippets required for a whole pipeline? What do we call the combined set of resources, shader source code snippets / stages, and so on? For my project, after a bunch of iteration I settled on the following:
+
+- ShaderStage describes a single stage of execution in the programmable graphics pipeline, and is our smallest distinct object
+- A Shader is a combination of ShaderStages that will eventually be used by a single graphics pipeline
+- A ShaderPack is a combination of Shaders, along with a resource script
+
+#### Designing an Efficient Interface
+
+#### Creating Descriptor Pools
 
 ##### Getting Strings Across A DLL Boundary
 
-I didn't explicitly note it earlier, but due to the large amount of dependencies ShaderTools requires I was rather determined to make this project work as a DLL/shared library - so that clients wouldn't have to also link to our huge pile of dependencies. This creates some restrictions though: for example, as I noted above we often want to retrieve the names of our resources and even the resource group they're in as strings. But how do we pass or retrieve strings across a DLL boundary? Just writing to an array of `const char*` pointers can be dangerous and expensive, as then we have to 
+I didn't explicitly note it earlier, but due to the large amount of dependencies ShaderTools requires I was rather determined to make this project work as a DLL/shared library - so that clients wouldn't have to also link to our huge pile of dependencies. This creates some restrictions though: for example, as I noted above we often want to retrieve the names of our resources and even the resource group they're in as strings. But how do we pass or retrieve strings across a DLL boundary? Just writing to an array of `const char*` pointers can be dangerous and expensive, as then we have to
 
 - make sure the pointers remain valid by storing copies of the strings somewhere
 - potentially copy what would've been temporary data into more permanent storagea
@@ -333,7 +407,7 @@ dll_retrieved_strings_t ShaderPack::GetShaderGroupNames() const {
 
 In case you were unaware, `strdrup` copies the strings and requires eventually calling `free` on the destination string pointers. I didn't want to enforce users to have to remember this step though, so by making the destructor of the `dll_retrieved_strings_t` structure call this (along with deleting it's copy constructor + assignment operator) we can effectively avoid leaking memory when passing these strings around. The easiest way to use it is by declaring a new scope with brackets, copying the strings into local storage, then exiting the brackets and letting the retrieved strings be cleaned up. It's an idea I got again from `std::lock_guard`, and it works splendidly! And in case you can't tell, I'm fairly proud of my clever little trick :)
 
-## ShaderPacks, Shaders, and ShaderStages
+## Potential Improvements
 
 Now with a full-featured resource system that allows for fully automated resource construction (in some cases), and that allows for our rendergraph to extract as much precious information as it can, it's time to move on to more of our higher-level design. This was an area I've struggled in, and I was only vaguely relieved to find a few other articles describing similar problems.
 

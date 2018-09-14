@@ -159,7 +159,7 @@ can still keep our plugin strictly decoupled from any clients, which is a big ad
 
 ### Thread the Loading Operations
 
-Our next requirement seems fairly apparent: Disk I/O can be an expensive operation, and it's also likely that users will want to post-process the data after loading. Take the ObjModel example in [Caelestis](https://github.com/fuchstraumer/Caelestis/blob/master/tests/plugin_tests/ResourceContextSceneTest/ObjModel.cpp), for example.
+Our next requirement seems fairly apparent: Disk I/O can be an expensive operation, and it's also likely that users will want to post-process the data after loading. Take the ObjModel example in [Caelestis](https://github.com/fuchstraumer/Caelestis/blob/a8e0ad765582e7e55b7f020e3e929f81f823783f/tests/plugin_tests/test_fixtures/ObjModel.cpp), for example.
 
 In that case, we load a bunch of data from disk then try to reduce duplicated vertices in the loaded data, making sure 
 that we only end up storing and using unique vertices (note - this is nearly directly copied from how Overv does it in
