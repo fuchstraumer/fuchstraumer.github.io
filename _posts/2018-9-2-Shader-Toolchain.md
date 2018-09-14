@@ -343,6 +343,10 @@ For one, naming our objects in an efficient way becomes difficult. What is a "Sh
 - A Shader is a combination of ShaderStages that will eventually be used by a single graphics pipeline
 - A ShaderPack is a combination of Shaders, along with a resource script
 
+A `ShaderStage` object is created using a file or shader name, and a `VkShaderStageFlagBits` value: we hash these and sort of "mux" them together into a single `uint64_t`, to create an ID field. We then use this ID field for sorting and storing our shader stages, as needed. This structure is fairly superfluous, and only exists because I ultimately needed it for logical reasons in the backend - most of the time, users will not even be interacting or using these objects. Indeed, their creation and use is mostly managed by the other higher-level objects.
+
+`Shader` in ShaderTools is a combination of `ShaderStage` objects, and includes resource metadata as well. It's assigned a unique name on construction as well, along with things like an array of GLSL extensions to enable and an array of strings representing include paths to generate later during the "generation" stage of the process.
+
 #### Designing an Efficient Interface
 
 #### Creating Descriptor Pools

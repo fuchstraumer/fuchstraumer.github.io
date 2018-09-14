@@ -1,9 +1,9 @@
 ---
 layout: post
-date: 2018-5-31
+date: 2018-9-14
 title: "Introduction to Vulkan"
 img: yosemite1.jpg
-published: false
+published: true
 tags: [Vulkan]
 ---
 
