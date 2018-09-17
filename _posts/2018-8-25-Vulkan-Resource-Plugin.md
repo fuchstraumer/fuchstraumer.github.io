@@ -77,7 +77,7 @@ VulkanResource* CreateImage(const VkImageCreateInfo*, const VkImageViewCreateInf
     const gpu_image_resource_data_t* initial_data, const uint32_t _memory_type, void* user_data);
 {% endhighlight %}
 
-The parameters that I haven't directly addressed yet are those used to se the initial contents of the buffers - `gpu_resource_data_t` is a structure that holds a pointer to some data along with the size of said data, along with some memory alignment and pitch information members as required. I unfortunately found out that a seperate, and more detailed, structure `gpu_image_resource_data_t` is effectively required in order for us to be able to set the initial data of images, however. We'll return to that shortly, however. The rest of the parameters should be fairly apparent - if we pass a `nullptr` for a `view_info` parameter, that resource's `ViewHandle` field won't be set as the view object won't be created (this will be pretty common with buffers, for example, unless we're using them as texel buffers).
+The parameters that I haven't directly addressed yet are those used to set the initial contents of the buffers - `gpu_resource_data_t` is a structure that holds a pointer to some data along with the size of said data, along with some memory alignment and pitch information members as required. I unfortunately found out that a seperate, and more detailed, structure `gpu_image_resource_data_t` is effectively required in order for us to be able to set the initial data of images, however. We'll return to that shortly, however. The rest of the parameters should be fairly apparent - if we pass a `nullptr` for a `view_info` parameter, that resource's `ViewHandle` field won't be set as the view object won't be created (this will be pretty common with buffers, for example, unless we're using them as texel buffers).
 
 #### Setting Initial Resource Data
 
@@ -107,7 +107,7 @@ struct gpu_image_resource_data_t {
 };
 {% endhighlight %}
 
-Via usage of this structure, we are now able to rather easily set the contents of everything from simple 1D linearly-tiled images made up of barely thousands of pixels, to uploading complex images with multiple mip levels like cubemaps or array textures. While it isn't *great* that we have two barely-differing structures that serve effectively the same purpose, the advantages of this approach are rather apparent and absolutely worth any minor code issues they may cause down the road. This brings us into our next major chunk of functionality though - that which will be used to transfer data into our resources.
+Via usage of this structure, we are now able to rather easily set the contents of everything from simple 1D linearly-tiled images made up of barely thousands of pixels, to uploading complex images with multiple mip levels like cubemaps or array textures. While it isn't *great* that we have two barely-differing structures that serve effectively the same purpose, the advantages of this approach are rather apparent and absolutely worth any minor code issues they may cause down the road. This brings us into our next major chunk of functionality though - which will be used to transfer data into our resources.
 
 ### Step 3: Transferring Resource Data to the GPU
 
@@ -118,7 +118,7 @@ Another area that can become potentially tricky is the transferring of data to t
 
 Our logic for handling transfers is split based on these memory types: host-visible memory is much easier to transfer into, as it's usually a designated region of RAM that the CPU and GPU share access to, and writing into it requires much less work. Effectively, it becomes: (assuming we're not using the `HOST_COHERENT` flag here, for performance reasons)
 
-- If we're not worried about readbacks, skip mapped memory region invalidation and just map the region we wish to copy into
+- If we're not worried about readbacks (can be parsed from usage flags), skip mapped memory region invalidation and just map the region we wish to copy into
 - Perform a simply `memcpy` to copy into the desired memory region, potentially using a simple `for` loop + an offset if we have an array of `gpu_resource_data_t` structures
 - Make sure to unmap the region once our transfer is complete
 - Lastly, call a Vulkan "flush" command to ensure our writes from the CPU are visible to the GPU as well
@@ -225,7 +225,9 @@ With our resources created and their initial data set, we can then freely procee
 void DestroyResource(VulkanResource* rsrc);
 {% endhighlight %}
 
-Internally, we use a switch case to read the `type` field of our resource structure, and then call a unique function for destroying our various types. In the case of buffers and images, we also perform additional checks to see if we created and `view` members and make sure these get destroyed, and lastly finish be making sure to call `allocator->FreeMemory()` to free and release the memory used by the resource as well. The only potential issue is making sure we aren't erasing out of containers while other threads are adding new entries, so we quickly nab the mutex and lock it via a `std::lock_guard`.
+Internally, we use a switch case to read the `type` field of our resource structure, and then call a unique function for destroying our various types. In the case of buffers and images, we also perform additional checks to see if we created and `view` members and make sure these get destroyed, and lastly finish be making sure to call `allocator->FreeMemory()` to free and release the memory used by the resource as well. The only potential issue is making sure we aren't erasing out of containers while other threads are adding new entries, so we quickly nab the mutex and lock it via a `std::lock_guard` so we can safely erase without invalidating iterators elsewhere. 
+
+Lastly, resource destruction isn't *required*, precisely. It's really really recommended, but someone forgetting to destroy a resource won't break the plugin or whatever system is using it. The resource plugin subscribes to swapchain resize and recreation notifications from the renderering context plugin, and as such has to destroy all of it's resources when that occurs (meaning clients have to take care of re-creating them). Additionally, we just clear out our container on shutdown too. I've considered changing this design, and would be open to input or suggestions on it - should I log warnings when resources are left remaining, thus effectively making it "bad" behavior to not delete resources? I'm not quite sure.
 
 ### Thread-Safety
 
@@ -285,4 +287,3 @@ The following are just various ideas I've had for improving this library, but ha
 - See if things like [Slim Reader/Writer locks](https://docs.microsoft.com/en-us/windows/desktop/Sync/slim-reader-writer--srw--locks), or critical sections and the corresponding Unix utilities, could be used to improve performance of the thread-safety related code
 - Interface this plugin with ShaderTools, so that this plugin can automatically create the backing resources required for a shader or shader group in one go
 - Make sure that submitting transfer work to a unique/dedicated transfer queue actually works, and doesn't cause ownership issues with the Vulkan API when said resources are used by the graphics queue
-  
