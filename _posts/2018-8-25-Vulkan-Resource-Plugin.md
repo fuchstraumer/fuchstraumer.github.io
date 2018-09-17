@@ -116,7 +116,7 @@ Another area that can become potentially tricky is the transferring of data to t
 - Host visible
 - Device local
 
-Our logic for handling transfers is split based on these memory types: host-visible memory is much easier to transfer into, as it's usually a designated region of RAM that the CPU and GPU share access to, and writing into it requires much less work. Effectively, it becomes: (assuming we're not using the `HOST_COHERENT` flag here, for performance reasons)
+Our logic for handling transfers is split based on these memory types (which is set by the `memory_type` parameter of our creation functions): host-visible memory is much easier to transfer into, as it's usually a designated region of RAM that the CPU and GPU share access to, and writing into it requires much less work. Effectively, it becomes: (assuming we're not using the `HOST_COHERENT` flag here, for performance reasons)
 
 - If we're not worried about readbacks (can be parsed from usage flags), skip mapped memory region invalidation and just map the region we wish to copy into
 - Perform a simply `memcpy` to copy into the desired memory region, potentially using a simple `for` loop + an offset if we have an array of `gpu_resource_data_t` structures
