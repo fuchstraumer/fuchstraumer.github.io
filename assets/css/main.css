@@ -3521,6 +3521,7 @@ template {
   -webkit-border-radius: 3px;
           border-radius: 3px;
   margin: 0;
+  overflow-x: auto;
 }
 
 .highlighter-rouge {
