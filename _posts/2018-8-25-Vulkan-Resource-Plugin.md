@@ -11,7 +11,7 @@ tags: [C++, Engine Development, Vulkan, Plugins]
 
 Last time, I covered the creation of a plugin for parallelizing the loading of assets from disk - this time, I'll be covering a plugin that plays very well with that system. Management of Vulkan API resources can be a tough topic: I've attempted to solve this problem about a dozen different ways by now, but I'm most content with this recent approach. When I refer to Vulkan resources I'm considering primarily `VkBuffer` and `VkImage`, but I also decided to integrate and support `VkSampler` in this system as well. 
 
-Like last time, this will be integrated as a plug-in for `Caelestis`, which can be found [here](https://github.com/fuchstraumer/Caelestis/commit/a0a486f6c9618e69b0061bd1a78d861de2424b0f). This is the `resource_context` plugin.
+Like last time, this will be integrated as a plug-in for `Caelestis`, which can be found [here](https://github.com/fuchstraumer/Caelestis/tree/a0a486f6c9618e69b0061bd1a78d861de2424b0f). This is the `resource_context` plugin.
 
 ## Why do we need to manage these resources?
 
