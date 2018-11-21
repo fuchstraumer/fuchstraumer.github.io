@@ -68,7 +68,7 @@ addUpdateEntry(idx, VkDescriptorUpdateTemplateEntry{
 });
 {% endhighlight %}
 
-This will insert a `VkDescriptorUpdateTemplateEntry` into the `std::vector` I'm using for these structures at the given idx, and in this case our `stride` field is the size of the structure with my update data (`rawDataEntry`) times the binding idx of our object. Nice and easy, this part is! But now, how do we go storing the update data? And how do we perform this updating?
+This will insert a `VkDescriptorUpdateTemplateEntry` into the `std::vector` I'm using for these structures at the given idx, and in this case our `stride` field is the size of the structure with my update data (`rawDataEntry`) times the binding idx of our object. Nice and easy, this part is! I will briefly say that a `VkDescriptorSetUpdateTemplate` also has two modes - the one I'm using, and a mode that makes it function somewhat like a more advanced push constant. This is all set and configured in the corresponding `createInfo` structure for this object, so definitely be sure to give the [corresponding documentation](https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorUpdateTemplateCreateInfo.html) a thorough read. Moving on though, how do we go storing the update data? And how do we perform this updating?
 
 ### Updating With A Descriptor Update Template
 
@@ -113,4 +113,4 @@ void Descriptor::BindResourceToIdx(size_t idx, VulkanResource* rsrc) {
 }
 {% endhighlight %}
 
-We keep a `dirty` flag so that when a user tries to grab the underlying `VkDescriptorSet` handle we are able to update the 
+We keep a `dirty` flag so that when a user tries to grab the underlying `VkDescriptorSet` handle we are able to update the descriptor set, so that they always get the most up-to-date version of it with the resources bound that they expect. `createdBindings` is just an `unordered_set` of indices - while trying to use this object, I realized I wasn't effectively tracking which locations had already had their `VkDescriptorSetUpdateTemplateEntry` and `rawDataEntry` objects created properly. This becomes problematic, of course, when we go to try to bind a resource to an index - if we already have the objects created, we can potentially save some time by just doing some simpler tasks to update the handles in the `rawDataEntry` object corresponding to that index.
