@@ -72,7 +72,14 @@ This will insert a `VkDescriptorUpdateTemplateEntry` into the `std::vector` I'm 
 
 ## Updating With A Descriptor Update Template
 
+As mentioned, when we call `vkUpdateDescriptorSetWithTemplate` we're going to be reading from a raw array containing just the bare minimum of data we need to update our descriptor entries. This still means we have a potential of three different structure types being used to store the data, though: how can we store them contiguously and together as if they were one type? Figuring this out took me a few minutes, as the solution isn't one I use often in my land of higher-level and more modern C++: we use a `union`. A union stores only one of it's fields at a time, but has a consistent size (the size of the largest member type). So, I created a `rawDataEntry` structure that looks like so:
 
+{% highlight cpp %}
+union rawDataEntry {
+    VkDescriptorBufferInfo BufferInfo;
+    VkDescriptorImageInfo ImageInfo;
+    VkBufferView BufferView;
+};
+{% endhighlight %}
 
-- required linear array of data entries per descriptor entry
-- have to use a union since there's no tidy way to do this
+Nothing at all surprising here - now when we want to add an entry for a new image at index `i`, we just add to our vector of these objects a `rawDataEntry` where we've initialized and filled out the field `ImageInfo`. The API knows from the `VkDescriptorUpdateTemplateEntry` we gave it earlier that when it goes to look at this index for the update data it should expect to find a `VkDescriptorImageInfo`, and so it interprets the data there as such and is able to use it to bind a specific `VkImageView` (and corresponding sampler, if it's a combined image-sampler) to a given location.
