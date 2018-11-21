@@ -7,6 +7,8 @@ published: true
 tags: [Vulkan, C++, Tools, Graphics]
 ---
 
+**This article is still WIP, so if you see it it's because I'm working on it at this very moment!**
+
 While trying to write a merge sort compute shader for my ongoing work to implement Volumetric Tiled Forward rendering, I noticed a potential scenario that I had absolutely no infrastructure or real ability to deal with: ping-pong bouncing of descriptor set bindings for usage in sorting shaders. The use case has us swapping the underlying buffers bound to the "input" and "output" locations of our sort shaders - so that we iteratively keep sorting the same dataset, consistently writing the ultimate results and converging to a solution.
 
 This isn't exactly a simple operation in Vulkan though, especially not with how my `vpr::DescriptorSet` abstraction is setup. That and trying to make resource creation and binding easier for your average user provided insight that I definitely needed a better descriptor abstraction - not just for the sets, but also for the layouts, most likely. It's going to sit upon the existing `vpr` objects, however, as I don't believe the functionality and implementation I have in mind belongs at the level of that library.
@@ -68,7 +70,7 @@ addUpdateEntry(idx, VkDescriptorUpdateTemplateEntry{
 });
 {% endhighlight %}
 
-This will insert a `VkDescriptorUpdateTemplateEntry` into the `std::vector` I'm using for these structures at the given idx, and in this case our `stride` field is the size of the structure with my update data (`rawDataEntry`) times the binding idx of our object. Nice and easy, this part is! I will briefly say that a `VkDescriptorSetUpdateTemplate` also has two modes - the one I'm using, and a mode that makes it function somewhat like a more advanced push constant. This is all set and configured in the corresponding `createInfo` structure for this object, so definitely be sure to give the [corresponding documentation](https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorUpdateTemplateCreateInfo.html) a thorough read. Moving on though, how do we go storing the update data? And how do we perform this updating?
+This will insert a `VkDescriptorUpdateTemplateEntry` into the `std::vector` I'm using for these structures at the given idx, and in this case our `stride` field is the size of the structure with my update data (`rawDataEntry`) times the binding idx of our object. Nice and easy, this part is! I will briefly say that a `VkDescriptorSetUpdateTemplate` also has two modes - the one I'm using, and a mode that makes it function somewhat like a more advanced push constant. This is all set and configured in the corresponding `createInfo` structure for this object, so definitely be sure to give the [corresponding documentation](https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorUpdateTemplateCreateInfo.html) a thorough read. Moving on though, how do we go about storing the update data? And how do we perform this updating?
 
 ### Updating With A Descriptor Update Template
 
