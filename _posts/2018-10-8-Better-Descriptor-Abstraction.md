@@ -3,7 +3,7 @@ layout: post
 date: 2018-9-14
 title: "Better Descriptor Abstraction In Vulkan"
 img: spider_meadows.jpg
-published: false
+published: true
 tags: [Vulkan, C++, Tools, Graphics]
 ---
 
@@ -40,7 +40,9 @@ This involves building an array of those write descriptors mentioned earlier, wh
 
 ## Update Templates?
 
-`VkDescriptorUpdateTemplate` has been around for a bit, but as of Vulkan 1.1 it's no longer a KHR extension and has been made a part of the core API. The premise of these update templates is 
+`VkDescriptorUpdateTemplate` has been around for a bit, but as of Vulkan 1.1 it's no longer a KHR extension and has been made a part of the core API. The premise of these update templates is to potentially reduce the overhead of updating what resources are bound to a descriptor, by reducing the size of the update data package. Instead of passing in a whole `VkWriteDescriptorSet`, we are effectively going to be only passing the smaller subset structure used to specify the handles to the resources we're using: `VkDescriptorBufferInfo`, `VkDescriptorImageInfo`, or just a plain `VkBufferView` for objects like texel buffers. 
+
+
 
 ## Registering Resources
 
