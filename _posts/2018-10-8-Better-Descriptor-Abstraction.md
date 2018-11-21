@@ -11,7 +11,7 @@ While trying to write a merge sort compute shader for my ongoing work to impleme
 
 This isn't exactly a simple operation in Vulkan though, especially not with how my `vpr::DescriptorSet` abstraction is setup. That and trying to make resource creation and binding easier for your average user provided insight that I definitely needed a better descriptor abstraction - not just for the sets, but also for the layouts, most likely. It's going to sit upon the existing `vpr` objects, however, as I don't believe the functionality and implementation I have in mind belongs at the level of that library.
 
-## Back To A Slot-Based Approach?
+### Back To A Slot-Based Approach?
 
 A classic fixture of older APIs was the idea of declaring or having a "slot" for a resource in a shader or pipeline (or the abstract idea of a pipeline, in most cases). One would say "Hey, I'm going to use a texture at slot 0" or something, then bind data to that actual slot before drawing with it. The process I'm going to use here will be vaguely similar - we declare our slots through structures like a `VkDescriptorSetLayout`, which is attached to a `VkPipelineLayout` and used to build a pipeline. At this point, we've only declared what type of resources we're going to use and where they're going to be bound. 
 
@@ -26,7 +26,7 @@ We'll call this repeatedly, most likely hooking into what our shader reflection 
 
 Under the hood, this is really just adding bindings to a `vpr::DescriptorSetLayout` object. We'll construct this object when required to, i.e. when we try to retrieve the `VkDescriptorSetLayout` handle for constructing a `VkPipelineLayout` for a pipeline that wants to use our `Descriptor`. This should be fairly low-cost, and keeps things nice and simple without requiring an explicit creation/initialization function.
 
-## Binding Resources Proper
+### Binding Resources Proper
 
 To bind the *actual* resources to be used in a drawing operation though, we'll bind one of our `VkDescriptorSet`s. Resources are bound to the descriptor set, then, when we call `VkUpdateDescriptorSet`. Doing this requires that we have built an array of `VkWriteDescriptorSet`s - these objects hold binding information, descriptor type info, and more importantly the handles to the actual resources we are going to use with this set. We'll add resources to bind through the following interface, using the `VulkanResource` object I created for my resource system ([article about that here](https://fuchstraumer.github.io/Vulkan-Resource-Plugin/)):
 
@@ -38,7 +38,7 @@ Unlike previous APIs, though, much of our data is still going to be baked into t
 
 This involves building an array of those write descriptors mentioned earlier, which can become relatively expensive since we *have* to (by decree of the specification) create one `VkWriteDescriptorSet` for each resource. This can ultimately become a bit wasteful due to things that aren't being updated, redundant state information being included (e.g what descriptor type is bound at location X), and so on. We can reduce the performance cost of updating these resources though - by using a `VkDescriptorUpdateTemplate`.
 
-## Update Templates?
+### Update Templates?
 
 `VkDescriptorUpdateTemplate` has been around for a bit, but as of Vulkan 1.1 it's no longer a KHR extension and has been made a part of the core API. The premise of these update templates is to potentially reduce the overhead of updating what resources are bound to a descriptor, by reducing the size of the update data package. Instead of passing in a whole `VkWriteDescriptorSet`, we are effectively going to be only passing the smaller subset structure used to specify the handles to the resources we're using: `VkDescriptorBufferInfo`, `VkDescriptorImageInfo`, or just a plain `VkBufferView` for objects like texel buffers. 
 
@@ -70,9 +70,9 @@ addUpdateEntry(idx, VkDescriptorUpdateTemplateEntry{
 
 This will insert a `VkDescriptorUpdateTemplateEntry` into the `std::vector` I'm using for these structures at the given idx, and in this case our `stride` field is the size of the structure with my update data (`rawDataEntry`) times the binding idx of our object. Nice and easy, this part is! But now, how do we go storing the update data? And how do we perform this updating?
 
-## Updating With A Descriptor Update Template
+### Updating With A Descriptor Update Template
 
-As mentioned, when we call `vkUpdateDescriptorSetWithTemplate` we're going to be reading from a raw array containing just the bare minimum of data we need to update our descriptor entries. This still means we have a potential of three different structure types being used to store the data, though: how can we store them contiguously and together as if they were one type? Figuring this out took me a few minutes, as the solution isn't one I use often in my land of higher-level and more modern C++: we use a `union`. A union stores only one of it's fields at a time, but has a consistent size (the size of the largest member type). So, I created a `rawDataEntry` structure that looks like so:
+As mentioned, when we call `vkUpdateDescriptorSetWithTemplate` we're going to be reading from a raw array containing just the bare minimum of data we need to update our descriptor entries. This still means we have a potential of three different structure types being used to store the data, though: how can we store them contiguously and together as if they were one type? Figuring this out took me a few minutes, as the solution isn't one I use often in my land of higher-level and more modern C++: we use a `union`. A union stores only one of it's fields at a time, but has a consistent size (the size of the largest member type). So, I created a `rawDataEntry` object that looks like so:
 
 {% highlight cpp %}
 union rawDataEntry {
@@ -82,4 +82,35 @@ union rawDataEntry {
 };
 {% endhighlight %}
 
-Nothing at all surprising here - now when we want to add an entry for a new image at index `i`, we just add to our vector of these objects a `rawDataEntry` where we've initialized and filled out the field `ImageInfo`. The API knows from the `VkDescriptorUpdateTemplateEntry` we gave it earlier that when it goes to look at this index for the update data it should expect to find a `VkDescriptorImageInfo`, and so it interprets the data there as such and is able to use it to bind a specific `VkImageView` (and corresponding sampler, if it's a combined image-sampler) to a given location.
+Nothing at all surprising here - now when we want to add an entry for a new image at index `i`, we just add to our vector of these objects (`rawEntries`) an instance of this union where we've initialized and filled out the field `ImageInfo`. The API knows from the `VkDescriptorUpdateTemplateEntry` we gave it earlier that when it goes to look at this index for the update data it should expect to find a `VkDescriptorImageInfo`, and so it interprets the data there as such and is able to use it to bind a specific `VkImageView` (and corresponding sampler, if it's a combined image-sampler) to a given location. Calling the update function itself is incredibly simple, now:
+
+{% highlight cpp %}
+vkUpdateDescriptorSetWithTemplate(device->vkHandle(), descriptorSet, updateTemplate, rawEntries.data());
+{% endhighlight %}
+
+Also, as an interesting note one may wish to consider for further refinements of this design and idea: an update template is *not* explicitly bound to a single descriptor set. It really is an update *template* that can be used with multiple descriptor sets, potentially allowing one to even more efficiently or effectively use it for updating multiple descriptor sets sharing the same layout throughout a frame. The way I use it here is the simplest case, and has already satisfied my requirements - but I'm interested in exploring this idea further and seeing how it can be refined (e.g, [what is suggested in this blog post](https://ourmachinery.com/post/vulkan-descriptor-sets-management/)). 
+
+### In-Use
+
+As mentioned above, we bind an actual physical resource to a location with a call to `BindResourceToIdx`. This takes in a location and a pointer to my `VulkanResource` structure ([created and explained in this article](https://fuchstraumer.github.io/Vulkan-Resource-Plugin/)), from which it is able to get the necessary info. This function itself breaks down to be fairly simple:
+
+{% highlight cpp %}
+void Descriptor::BindResourceToIdx(size_t idx, VulkanResource* rsrc) {
+    // set a flag so we make sure to call update() on next use in a frame
+    if (!dirty) {
+        dirty = true;
+    }
+
+    // no resource bound at that index yet, create the required data entries
+    if (createdBindings.count(idx) == 0) {
+        addDescriptorBinding(idx, rsrc);
+    }
+    else {
+        // just update the handles used at idx
+        updateDescriptorBinding(idx, rsrc);
+    }
+   
+}
+{% endhighlight %}
+
+We keep a `dirty` flag so that when a user tries to grab the underlying `VkDescriptorSet` handle we are able to update the 
