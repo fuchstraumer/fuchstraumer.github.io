@@ -90,7 +90,7 @@ vkUpdateDescriptorSetWithTemplate(device->vkHandle(), descriptorSet, updateTempl
 
 Also, as an interesting note one may wish to consider for further refinements of this design and idea: an update template is *not* explicitly bound to a single descriptor set. It really is an update *template* that can be used with multiple descriptor sets, potentially allowing one to even more efficiently or effectively use it for updating multiple descriptor sets sharing the same layout throughout a frame. The way I use it here is the simplest case, and has already satisfied my requirements - but I'm interested in exploring this idea further and seeing how it can be refined (e.g, [what is suggested in this blog post](https://ourmachinery.com/post/vulkan-descriptor-sets-management/)). 
 
-### In-Use
+### Binding With Update Templates
 
 As mentioned above, we bind an actual physical resource to a location with a call to `BindResourceToIdx`. This takes in a location and a pointer to my `VulkanResource` structure ([created and explained in this article](https://fuchstraumer.github.io/Vulkan-Resource-Plugin/)), from which it is able to get the necessary info. This function itself breaks down to be fairly simple:
 
@@ -114,3 +114,9 @@ void Descriptor::BindResourceToIdx(size_t idx, VulkanResource* rsrc) {
 {% endhighlight %}
 
 We keep a `dirty` flag so that when a user tries to grab the underlying `VkDescriptorSet` handle we are able to update the descriptor set, so that they always get the most up-to-date version of it with the resources bound that they expect. `createdBindings` is just an `unordered_set` of indices - while trying to use this object, I realized I wasn't effectively tracking which locations had already had their `VkDescriptorSetUpdateTemplateEntry` and `rawDataEntry` objects created properly. This becomes problematic, of course, when we go to try to bind a resource to an index - if we already have the objects created, we can potentially save some time by just doing some simpler tasks to update the handles in the `rawDataEntry` object corresponding to that index.
+
+### Example and Conclusion
+
+As a quick example to verify that my Descriptor implementation works (header available here, and source here), here's a quick test I created for it: in it, pressing the `V` key toggles between two textures for the skybox. Switching between them seems to work without issues, and now that I've got my abstracted interface working it seems to be easier than the alternative:
+
+It has also allowed me to proceed with my implementation of the sorting algorithm from that DX12 lighting method - and in hindsight, could allow one to more closely emulate how DX12 allows one to do fairly late binding of resources (at least compared to my bind-early approach implemented in `vpr::DescriptorSet`). The only caveat is that I don't store much metadata or info about what resource is bound to an index - so if I wanted to change the binding of the resource called "InputKeys" in a `DescriptorObject`, I'd have to rely on a higher level abstraction associating the names of the resources to an index (i.e, I use a `std::unordered_map<std::string, size_t>` in the object that manages the lifetime of the `Descriptor`s I create for a group of shaders).
