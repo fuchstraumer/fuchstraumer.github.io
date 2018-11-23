@@ -51,21 +51,13 @@ But the amount of factors one must consider when computing a trajectory are rath
 include:
 
 - solar pressure, or the force of the solar wind on sunward elements of a spacecraft
-
 - minute atmospheric drag forces - even the space station, for example, experiences some atmospheric drag at it's altitude in LEO
-
 - as an additional note on the above, the sun's relative activity level can also cause the thermosphere to expand, increasing atmospheric drag
-
 - drag due to the local magnetic field, itself also affected by the sun
-
 - tidal effects, due to the shifting of mass with the tides
-
 - even the lower-atmospheric tides have recently been added to models!
-
 - in the case of tethered spacecraft, the temperature of the Tether changing the tether material's properties also affects orbit propagation
-
 - n-body perturbation effects - e.g, the Moon for objects in LEO, or most of the solar system for craft in deep space
-
 - and of course, the gravity field of the primary body influencing the simulation
 
 If you'd like to read more on the complex topics of atmospheric drag (it's kinda fascinating!), I found [this
@@ -236,9 +228,7 @@ I remember sitting at my desk that day a few weeks ago thinking "Well, *shit*". 
 issues I fixed. But timelines are tight, and I could've fixed the root cause far sooner and moved on if I had 
 
 - reflected more on my own code
-
 - tested my own code
-
 - not let my confidence go entirely to my head
 
 I spent the rest of that day going through my math code, double checking it rigorously. And I actually did fix a few things, to be honest. It was an important 
