@@ -121,4 +121,8 @@ We keep a `dirty` flag so that when a user tries to grab the underlying `VkDescr
 
 As a quick example to verify that my Descriptor implementation works (header available here, and source here), here's a quick test I created for it: in it, pressing the `V` key toggles between two textures for the skybox. Switching between them seems to work without issues, and now that I've got my abstracted interface working it seems to be easier than the alternative:
 
+<iframe width="400" height="300" 
+src="https://giant.gfycat.com/FeminineFlawlessLacewing.webm">
+</iframe>
+
 It has also allowed me to proceed with my implementation of the sorting algorithm from that DX12 lighting method - and in hindsight, could allow one to more closely emulate how DX12 allows one to do fairly late binding of resources (at least compared to my bind-early approach implemented in `vpr::DescriptorSet`). The only caveat is that I don't store much metadata or info about what resource is bound to an index - so if I wanted to change the binding of the resource called "InputKeys" in a `DescriptorObject`, I'd have to rely on a higher level abstraction associating the names of the resources to an index (i.e, I use a `std::unordered_map<std::string, size_t>` in the object that manages the lifetime of the `Descriptor`s I create for a group of shaders).
