@@ -312,8 +312,6 @@ There's still ample room for improvement - but it works well enough as is for no
 
 To close out, here's an example video of me testing this very plugin on Mac OSX - which served as verification that Vulkan (shimmed to Metal thanks to MoltenVk) was working on Mac, and that I wasn't going to have to deal with any weird bugs (thank heck) on Mac. Here, we asynchronously load three items: a skybox texture from a  `.dds` file, a `.png` texture for the house, and the `.obj` mesh data for the house:
 
-<iframe width="400" height="300" 
-src="https://giant.gfycat.com/CautiousKlutzyAcornweevil.webm">
-</iframe>
-
-
+<div>
+    <video class = "center" src="https://giant.gfycat.com/CautiousKlutzyAcornweevil.webm" width="400" height="300">
+</div>
