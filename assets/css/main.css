@@ -242,6 +242,10 @@ textarea {
   /* 2 */
 }
 
+iframe {
+  display: block;
+}
+
 /**
  * Show the overflow in IE.
  * 1. Show the overflow in Edge.
