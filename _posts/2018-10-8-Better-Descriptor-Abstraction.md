@@ -10,8 +10,8 @@ tags: [Vulkan, C++, Tools, Graphics]
 <meta property="og:url" content="https://fuchstraumer.github.io/Better-Descriptor-Abstraction/">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Writing A Better Descriptor Abstraction For Vulkan">
-<meta property="og:description" content="How can we write a performant and easy to use abstraction over Vulkan's descriptor system?">
-
+<meta property="og:description" content="How can we write a performant and easy to use abstraction over Vulkan's descriptor system? We'll also explore using Descriptor Set Update Templates.">
+<meta property="og:image" content="https://fuchstraumer.github.io/assets/img/spider_meadows.jpg">
 
 While trying to write a merge sort compute shader for my ongoing work to implement Volumetric Tiled Forward rendering, I noticed a potential scenario that I had absolutely no infrastructure or real ability to deal with: ping-pong bouncing of descriptor set bindings for usage in sorting shaders. The use case has us swapping the underlying buffers bound to the "input" and "output" locations of our sort shaders - so that we iteratively keep sorting the same dataset, consistently writing the ultimate results and converging to a solution.
 
