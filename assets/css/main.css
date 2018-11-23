@@ -201,10 +201,6 @@ video {
   display: block
 }
 
-iframe {
-  margin: 0 auto;
-}
-
 /**
  * Add the correct display in iOS 4-7.
  */
@@ -250,6 +246,7 @@ textarea {
 
 iframe {
   display: block;
+  margin: 0 auto;
 }
 
 /**
