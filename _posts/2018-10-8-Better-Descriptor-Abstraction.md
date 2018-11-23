@@ -7,8 +7,6 @@ published: true
 tags: [Vulkan, C++, Tools, Graphics]
 ---
 
-**This article is still WIP, so if you see it it's because I'm working on it at this very moment!**
-
 While trying to write a merge sort compute shader for my ongoing work to implement Volumetric Tiled Forward rendering, I noticed a potential scenario that I had absolutely no infrastructure or real ability to deal with: ping-pong bouncing of descriptor set bindings for usage in sorting shaders. The use case has us swapping the underlying buffers bound to the "input" and "output" locations of our sort shaders - so that we iteratively keep sorting the same dataset, consistently writing the ultimate results and converging to a solution.
 
 This isn't exactly a simple operation in Vulkan though, especially not with how my `vpr::DescriptorSet` abstraction is setup. That and trying to make resource creation and binding easier for your average user provided insight that I definitely needed a better descriptor abstraction - not just for the sets, but also for the layouts, most likely. It's going to sit upon the existing `vpr` objects, however, as I don't believe the functionality and implementation I have in mind belongs at the level of that library.
@@ -126,3 +124,5 @@ src="https://giant.gfycat.com/FeminineFlawlessLacewing.webm">
 </iframe>
 
 It has also allowed me to proceed with my implementation of the sorting algorithm from that DX12 lighting method - and in hindsight, could allow one to more closely emulate how DX12 allows one to do fairly late binding of resources (at least compared to my bind-early approach implemented in `vpr::DescriptorSet`). The only caveat is that I don't store much metadata or info about what resource is bound to an index - so if I wanted to change the binding of the resource called "InputKeys" in a `DescriptorObject`, I'd have to rely on a higher level abstraction associating the names of the resources to an index (i.e, I use a `std::unordered_map<std::string, size_t>` in the object that manages the lifetime of the `Descriptor`s I create for a group of shaders).
+
+This article was fairly short, but I'm trying to use more of this format from here on out: hopefully, it helped clarify some potential uses of descriptor set update templates (and how one can get them to work, e.g using a `union` and so on). If I'm lucky, it'll help give you some ideas for making a robust and easy-to-use abstraction for descriptors in Vulkan - without completely comprimising on performance while doing so. As always, feel free to contact me with questions or leave them as comments. Criticism, ideas, and clarification is always welcomed!
