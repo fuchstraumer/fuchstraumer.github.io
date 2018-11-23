@@ -7,6 +7,12 @@ img: moon.jpg
 tag: [Space, NASA, Legacy Code, C++, Spherical Harmonics]
 ---
 
+<meta property="og:url" content="https://fuchstraumer.github.io/Lunar-Gravity-And-Humility/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Lunar Gravity Models and a Lesson in Humility">
+<meta property="og:description" content="Learn more about the complex modelling of spacecraft, and watch as I learn an important lesson about testing and humility when working in a legacy codebase.">
+<meta property="og:image" content="https://fuchstraumer.github.io/assets/img/moon.jpg">
+
 My current work project has involved performing some fascinating and _really_ hard math
 and modelling work for Goddard Space Flight Center, in support of the potential [BOLAS](https://www.nasa.gov/feature/goddard/2017/nasa-studies-tethered-cubesat-mission-to-study-lunar-swirls)
 mission. This has entailed diving into a codebase written primarily from 1990-1993, giving

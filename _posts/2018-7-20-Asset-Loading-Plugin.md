@@ -7,6 +7,12 @@ published: true
 tags: [C++, Engine Development, Vulkan, Plugins]
 ---
 
+<meta property="og:url" content="https://fuchstraumer.github.io/Asset-Loading-Plugin/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Making a Multithreaded Asset Loader Plugin in C++">
+<meta property="og:description" content="We'll create an asset loader that offloads the loading work to multiple threads, while making sure to still cache resources and clean them up fully as required. All across a DLL!">
+<meta property="og:image" content="https://fuchstraumer.github.io/assets/img/brick_mountains.jpg">
+
 # Creating an Asset Loading Plugin in C++
 
 It will be a common task in an engine - or any sort of application, really, to load

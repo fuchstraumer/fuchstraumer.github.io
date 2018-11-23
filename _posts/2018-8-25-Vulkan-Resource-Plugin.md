@@ -7,6 +7,12 @@ published: true
 tags: [C++, Engine Development, Vulkan, Plugins]
 ---
 
+<meta property="og:url" content="https://fuchstraumer.github.io/Vulkan-Resource-Plugin/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Making a Vulkan Resource Plugin in C++">
+<meta property="og:description" content="Let's write a performant and simple Vulkan resource plugin, working around the restriction of shared libraries along with making sure to empower users without drowning them in complexity.">
+<meta property="og:image" content="https://fuchstraumer.github.io/assets/img/river_mountain.jpg">
+
 # Creating a Vulkan Resource-Management plugin
 
 Last time, I covered the creation of a plugin for parallelizing the loading of assets from disk - this time, I'll be covering a plugin that plays very well with that system. Management of Vulkan API resources can be a tough topic: I've attempted to solve this problem about a dozen different ways by now, but I'm most content with this recent approach. When I refer to Vulkan resources I'm considering primarily `VkBuffer` and `VkImage`, but I also decided to integrate and support `VkSampler` in this system as well. 
