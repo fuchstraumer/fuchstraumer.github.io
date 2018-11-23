@@ -119,7 +119,7 @@ We keep a `dirty` flag so that when a user tries to grab the underlying `VkDescr
 
 ### Example and Conclusion
 
-As a quick example to verify that my Descriptor implementation works (header available here, and source here), here's a quick test I created for it: in it, pressing the `V` key toggles between two textures for the skybox. Switching between them seems to work without issues, and now that I've got my abstracted interface working it seems to be easier than the alternative:
+As a quick example to verify that my Descriptor implementation works ([header available here](https://github.com/fuchstraumer/DiamondDogs/blob/27fa3493e14940c95547bbbc130dd777994cd192/modules/rendergraph_module/include/Descriptor.hpp), [and source here](https://github.com/fuchstraumer/DiamondDogs/blob/27fa3493e14940c95547bbbc130dd777994cd192/modules/rendergraph_module/src/Descriptor.cpp)), here's a quick test I created for it: in it, pressing the `V` key toggles between two textures for the skybox. Switching between them seems to work without issues, and now that I've got my abstracted interface working it seems to be easier than the alternative:
 
 <iframe width="400" height="300" 
 src="https://giant.gfycat.com/FeminineFlawlessLacewing.webm">
