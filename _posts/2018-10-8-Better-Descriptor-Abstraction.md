@@ -13,7 +13,7 @@ tags: [Vulkan, C++, Tools, Graphics]
 <meta property="og:description" content="How can we write a performant and easy to use abstraction over Vulkan's descriptor system? We'll also explore using Descriptor Set Update Templates.">
 <meta property="og:image" content="https://fuchstraumer.github.io/assets/img/spider_meadows.jpg">
 
-While trying to write a merge sort compute shader for my ongoing work to implement Volumetric Tiled Forward rendering, I noticed a potential scenario that I had absolutely no infrastructure or real ability to deal with: ping-pong bouncing of descriptor set bindings for usage in sorting shaders. The use case has us swapping the underlying buffers bound to the "input" and "output" locations of our sort shaders - so that we iteratively keep sorting the same dataset, consistently writing the ultimate results and converging to a solution.
+While trying to write a merge sort compute shader for my ongoing work to implement [Volumetric Tiled Forward lighting](https://www.3dgep.com/volume-tiled-forward-shading/), I noticed a potential scenario that I had absolutely no infrastructure or real ability to deal with: ping-pong bouncing of descriptor set bindings for usage in sorting shaders. The use case has us swapping the underlying buffers bound to the "input" and "output" locations of our sort shaders - so that we iteratively keep sorting the same dataset, consistently writing the ultimate results and converging to a solution.
 
 This isn't exactly a simple operation in Vulkan though, especially not with how my `vpr::DescriptorSet` abstraction is setup. That and trying to make resource creation and binding easier for your average user provided insight that I definitely needed a better descriptor abstraction - not just for the sets, but also for the layouts, most likely. It's going to sit upon the existing `vpr` objects, however, as I don't believe the functionality and implementation I have in mind belongs at the level of that library.
 
@@ -28,7 +28,7 @@ void AddLayoutBinding(const size_t idx, const VkDescriptorType type);
 void AddLayoutBinding(const VkDescriptorSetLayoutBinding& binding);
 {% endhighlight %}
 
-We'll call this repeatedly, most likely hooking into what our shader reflection system provides (for me, ShaderTools). This way we can reflect on our shaders being used and use that to construct layout info for our new `Descriptor` object - without needing to bind any resources quite yet. This is particularly nice for things like textures and samplers, and other cases where we aren't able to automate the construction of the backing resources for a given slot. 
+We'll call this repeatedly, most likely hooking into what our shader reflection system provides (for me, [ShaderTools](https://github.com/fuchstraumer/ShaderTools)). This way we can reflect on our shaders being used and use that to construct layout info for our new `Descriptor` object - without needing to bind any resources quite yet. This is particularly nice for things like textures and samplers, and other cases where we aren't able to automate the construction of the backing resources for a given slot. 
 
 Under the hood, this is really just adding bindings to a `vpr::DescriptorSetLayout` object. We'll construct this object when required to, i.e. when we try to retrieve the `VkDescriptorSetLayout` handle for constructing a `VkPipelineLayout` for a pipeline that wants to use our `Descriptor`. This should be fairly low-cost, and keeps things nice and simple without requiring an explicit creation/initialization function.
 
